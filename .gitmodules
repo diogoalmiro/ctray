@@ -1,0 +1,3 @@
+[submodule "tray"]
+	path = tray
+	url = git@github.com:zserge/tray.git
