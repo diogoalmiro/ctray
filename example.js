@@ -1,8 +1,9 @@
+let path = require('path');
 let Tray = require('./tray');
 
 let item = (txt) => ({text:txt, callback: () => console.log(txt)})
 
-let tray = new Tray(__dirname+"tray/icon.png", [
+let tray = new Tray(path.join(__dirname,"ctray.ico"), [
     item("Hello World!"),
     item("Hello Tray!"),
     item("Hello C++!"),
