@@ -1,6 +1,6 @@
 #include <napi.h>
 #include <thread>
-#include "tray/tray.h"
+#include "tray.h"
 
 #define THROW( error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
@@ -9,12 +9,12 @@ std::thread thread;
 void TrayLoop(struct tray *tray, const Napi::Env env, const Napi::Promise::Deferred deferred){
     int r = 0;
     r = tray_init(tray);
-    if( r == -1 ) deferred.Reject(Napi::String::New(env, "tray_init returned -1"));
+    if( r == -1 ) {
+        return deferred.Reject(Napi::String::New(env, "tray_init returned -1"));
+    }
     
-    while(tray_loop(1) == 0){};
+    while(tray_loop(1) == 0){ };
 
-    tray_exit();
-    
     deferred.Resolve(env.Null());
 }
 
@@ -156,8 +156,7 @@ Napi::Value Setup(const Napi::CallbackInfo& info){
 
     thistray->menu = NapiArray2MenuStruct(env, menu);
     
-    thread = std::thread (TrayLoop,thistray, env, deferred);
-
+    thread = std::thread (TrayLoop, thistray, env, deferred);
 
     return deferred.Promise();
 }

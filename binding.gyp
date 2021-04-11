@@ -6,13 +6,12 @@
             "ldflags": ["-g"],
             "cflags!": [ "-fno-exceptions" ],
             "cflags_cc!": [ "-fno-exceptions" ],
+            "cflags_cc" : ["-std=c++20"],
             "sources": [ "addon.cc" ],
             "include_dirs": [
                 "<!@(node -p \"require('node-addon-api').include\")"
             ],
-            "dependencies": [
-                "<!@(node -p \"require('node-addon-api').gyp\")"
-            ],
+            "dependencies": [],
             'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ],
             'conditions': [ # Initials checks on tray/Makefile
                 ["OS=='linux'", {
@@ -20,12 +19,13 @@
                     "ldflags+": ["<!@(pkg-config --libs appindicator3-0.1)"],
                 }],
                 ["OS=='win'", {
-                    "cflags+": ["-DTRAY_WINAPI=1"]
+                    "defines":["TRAY_WINAPI=1"]
                 }],
                 ["OS=='mac'", {
                     "cflags+": ["-DTRAY_APPKIT=1"],
                     "dflags+": ["-framework Cocoa"]
                 }]
             ]
-        }]
+        }
+    ]
 }
