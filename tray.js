@@ -1,4 +1,5 @@
 const {fork} = require("child_process");
+const {join} = require("path");
 const EventEmiter = require("events").EventEmitter;
 
 module.exports = class Tray extends EventEmiter{
@@ -12,7 +13,7 @@ module.exports = class Tray extends EventEmiter{
     start(){
         if( this.started ) return;
         this.started = true;
-        this.process = fork("tray-process.js");
+        this.process = fork(join(__dirname, "tray-process.js"));
         this.process.on("message", msg => {
             let {type, index} = JSON.parse(msg);
             if( type=='click' && this.cbs[index] ){
