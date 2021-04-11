@@ -18,6 +18,13 @@
                 ["OS=='linux'", {
                     "cflags+": ["-DTRAY_APPINDICATOR=1", "<!@(pkg-config --cflags appindicator3-0.1)"],
                     "ldflags+": ["<!@(pkg-config --libs appindicator3-0.1)"],
+                }],
+                ["OS=='win'", {
+                    "cflags+": ["-DTRAY_WINAPI=1"]
+                }],
+                ["OS=='mac'", {
+                    "cflags+": ["-DTRAY_APPKIT=1"],
+                    "dflags+": ["-framework Cocoa"]
                 }]
             ]
         }]
