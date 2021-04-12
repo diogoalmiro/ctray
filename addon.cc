@@ -4,17 +4,35 @@
 
 #define THROW( error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
-std::thread thread;
 
-void TrayLoop(struct tray *tray){
-    int r = 0;
-    r = tray_init(tray);
-    if( r == -1 ) {
-        return;
-    }
+class TrayWorker : public Napi::AsyncWorker {
+    public:
+        TrayWorker(Napi::Env env, struct tray* tray) :
+            Napi::AsyncWorker(env), tray(tray), deferred(Napi::Promise::Deferred::New(env)) { }
+        ~TrayWorker() {}
+
+        void Execute(){
+            // Tray Loop
+            int r = 0;
+            r = tray_init(this->tray);
+            if( r == -1 ) {
+                return;
+            }
     
-    while(tray_loop(1) == 0){ };
-}
+            while(tray_loop(1) == 0){ };
+        }
+
+        void OnOK(){
+            deferred.Resolve(Env().Undefined());
+        }
+
+        Napi::Promise GetPromise(){
+            return deferred.Promise();
+        }
+    private:
+        Napi::Promise::Deferred deferred;
+        struct tray* tray;
+};
 
 struct callbackContext {
     Napi::ThreadSafeFunction callback;
@@ -163,9 +181,13 @@ Napi::Value Setup(const Napi::CallbackInfo& info){
 
     thistray->menu = NapiArray2MenuStruct(env, menu);
     
-    thread = std::thread (TrayLoop, thistray);
+    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
 
-    return env.Undefined();
+    TrayWorker *worker = new TrayWorker(env, thistray);
+    Napi::Promise promise = worker->GetPromise();
+    
+    worker->Queue();
+    return promise;
 }
 
 
