@@ -6,16 +6,14 @@
 
 std::thread thread;
 
-void TrayLoop(struct tray *tray, const Napi::Env env, const Napi::Promise::Deferred deferred){
+void TrayLoop(struct tray *tray){
     int r = 0;
     r = tray_init(tray);
     if( r == -1 ) {
-        return deferred.Reject(Napi::String::New(env, "tray_init returned -1"));
+        return;
     }
     
     while(tray_loop(1) == 0){ };
-
-    deferred.Resolve(env.Null());
 }
 
 struct callbackContext {
@@ -40,6 +38,11 @@ struct tray_menu* NapiArray2MenuStruct(Napi::Env env, Napi::Array napimenu){
 
     for (size_t i = 0; i < msize; i++){
         Napi::Value curr = napimenu.Get(i);
+        if( curr.IsString() ){
+            Napi::Object c = Napi::Object::New(env);
+            c.Set("text", curr.As<Napi::String>());
+            curr = c;
+        }
         if( !curr.IsObject() ){
             THROW("Expected all array elements to be Objects.");
             return NULL;
@@ -130,25 +133,29 @@ void NapiObject2struct(struct tray_menu* r, Napi::Env env, Napi::Object obj){
 
 Napi::Value Setup(const Napi::CallbackInfo& info){
     Napi::Env env = info.Env();
-    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-    struct tray *thistray = new (struct tray);
+    struct tray* thistray = new (struct tray);
 
     if( info.Length() < 2 ){
         THROW("Expected two arguments, \"icon\": string and \"menu\": array.");
-        return env.Null();
+        return env.Undefined();
     }
     if( !info[0].IsString() ){
         THROW("Expected argument \"icon\" to be a string.");
-        return env.Null();
+        return env.Undefined();
     }
     if( !info[1].IsArray() ){
         THROW("Expected argument \"menu\" to be an array.");
-        return env.Null();
+        return env.Undefined();
     }
 
 
     Napi::String icon = info[0].As<Napi::String>();
     Napi::Array menu = info[1].As<Napi::Array>();
+
+    if( menu.Length() < 1 ){
+        THROW("Expected argument \"menu\" to have at least one element.");
+        return env.Undefined();
+    }
 
     std::string iname = icon.Utf8Value();
     thistray->icon = new char[iname.length()+1];
@@ -156,9 +163,9 @@ Napi::Value Setup(const Napi::CallbackInfo& info){
 
     thistray->menu = NapiArray2MenuStruct(env, menu);
     
-    thread = std::thread (TrayLoop, thistray, env, deferred);
+    thread = std::thread (TrayLoop, thistray);
 
-    return deferred.Promise();
+    return env.Undefined();
 }
 
 

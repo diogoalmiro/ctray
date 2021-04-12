@@ -11,7 +11,7 @@ process.once("message", json => {
     });
 
     if( type == "setup"){
-        singleTray.setup(name, menu).then( _ => console.log("ended") ).catch( e => console.log(e) );
+        singleTray.setup(name, menu);
     }
 });
 
