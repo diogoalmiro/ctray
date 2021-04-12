@@ -1,17 +1,38 @@
 let singleTray = require('bindings')('tray');
 
-process.once("message", json => {
+process.on("message", json => {
+
+    let {action, arguments} = JSON.parse(json);
+    if( action == "update" ){
+        arguments[1] = JSON.parse(arguments[1], (name, value) => {
+            if( name != "callback" ) return value;
+            
+            return () => process.send(JSON.stringify({type:"callback", action: value}));
+        })
+    }
     
+    if( action in singleTray ){
+        try{
+            let promise = singleTray[action].apply(singleTray, arguments);
 
-    
-    let {type, name, menu} = JSON.parse(json, (name, value) => {
-        if( name != "callback" ) return value;
-
-        return () => process.send(JSON.stringify({type:"click", index: value}));
-    });
-
-    if( type == "setup"){
-        singleTray.setup(name, menu).then(_ => console.log("exited")).catch(e => console.log(e));
+            
+            if( !promise ){
+                process.send(JSON.stringify({type: "callback", action}))
+            }
+            else{
+                promise.then(_ => {
+                    process.send(JSON.stringify({type: "callback", action}))
+                }).catch(e => {
+                    process.send(JSON.stringify({type: "callback", action, error: e.message}))
+                })
+            }
+        }
+        catch(e){
+            process.send(JSON.stringify({type:"callback", action, error: e.message}))
+        }
+    }
+    else{
+        process.send(JSON.stringify({type:"callback", action, error: `Not found.`}))
     }
 });
 

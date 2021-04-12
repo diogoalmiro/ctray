@@ -4,21 +4,17 @@
 
 #define THROW( error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
+struct tray* tray = NULL;
 
 class TrayWorker : public Napi::AsyncWorker {
     public:
-        TrayWorker(Napi::Env env, struct tray* tray) :
-            Napi::AsyncWorker(env), tray(tray), deferred(Napi::Promise::Deferred::New(env)) { }
+        TrayWorker(Napi::Env env) :
+            Napi::AsyncWorker(env), 
+            deferred(Napi::Promise::Deferred::New(env)) { }
         ~TrayWorker() {}
 
         void Execute(){
             // Tray Loop
-            int r = 0;
-            r = tray_init(this->tray);
-            if( r == -1 ) {
-                return;
-            }
-    
             while(tray_loop(1) == 0){ };
         }
 
@@ -31,7 +27,6 @@ class TrayWorker : public Napi::AsyncWorker {
         }
     private:
         Napi::Promise::Deferred deferred;
-        struct tray* tray;
 };
 
 struct callbackContext {
@@ -148,11 +143,8 @@ void NapiObject2struct(struct tray_menu* r, Napi::Env env, Napi::Object obj){
     }
 }
 
-
-Napi::Value Setup(const Napi::CallbackInfo& info){
+Napi::Value Update(const Napi::CallbackInfo& info){
     Napi::Env env = info.Env();
-    struct tray* thistray = new (struct tray);
-
     if( info.Length() < 2 ){
         THROW("Expected two arguments, \"icon\": string and \"menu\": array.");
         return env.Undefined();
@@ -166,7 +158,6 @@ Napi::Value Setup(const Napi::CallbackInfo& info){
         return env.Undefined();
     }
 
-
     Napi::String icon = info[0].As<Napi::String>();
     Napi::Array menu = info[1].As<Napi::Array>();
 
@@ -174,16 +165,35 @@ Napi::Value Setup(const Napi::CallbackInfo& info){
         THROW("Expected argument \"menu\" to have at least one element.");
         return env.Undefined();
     }
-
+    int wasNull = 0;
+    if( tray == NULL ){
+        tray = new (struct tray);
+        wasNull = 1;
+    }
     std::string iname = icon.Utf8Value();
-    thistray->icon = new char[iname.length()+1];
-    strcpy(thistray->icon, iname.c_str());
+    tray->icon = new char[iname.length()+1];
+    strcpy(tray->icon, iname.c_str());
 
-    thistray->menu = NapiArray2MenuStruct(env, menu);
+    tray->menu = NapiArray2MenuStruct(env, menu);
     
-    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+    if( wasNull ){
+        tray_init(tray);
+    }
+    else{
+        tray_update(tray);
+    }
+    return env.Undefined();
+}
 
-    TrayWorker *worker = new TrayWorker(env, thistray);
+Napi::Value Stop(const Napi::CallbackInfo& info){
+    tray_exit();
+    return info.Env().Undefined();
+}
+
+Napi::Value Start(const Napi::CallbackInfo& info){
+    Napi::Env env = info.Env();
+    
+    TrayWorker *worker = new TrayWorker(env);
     Napi::Promise promise = worker->GetPromise();
     
     worker->Queue();
@@ -192,7 +202,9 @@ Napi::Value Setup(const Napi::CallbackInfo& info){
 
 
 Napi::Object Export(Napi::Env env, Napi::Object exports){
-    exports.Set("setup", Napi::Function::New<Setup>(env));
+    exports.Set("start", Napi::Function::New<Start>(env));
+    exports.Set("update", Napi::Function::New<Update>(env));
+    exports.Set("stop", Napi::Function::New<Stop>(env));
     return exports;
 }
 

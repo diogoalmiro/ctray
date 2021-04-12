@@ -1,47 +1,53 @@
 const {fork} = require("child_process");
 const {join} = require("path");
-const EventEmiter = require("events").EventEmitter;
 
-module.exports = class Tray extends EventEmiter{
-    constructor(name, menu){
-        super();
-        this.name = name;
+module.exports = class Tray{
+    constructor(icon, menu){
+        this.icon = icon;
         this.menu = menu;
-        this.started = false;
+        this.cbs = [];
+        this.cbs.stop = () => this.process.kill();
+        this.i = 0;
+        // create connection to child
+        this.process = fork(join(__dirname, "tray-process.js"));
+        this.process.on("message", msg => {
+            let {type, action, error} = JSON.parse(msg);
+            if( error ){
+                console.error(`tray.${action}() -> ${error}`);
+            }
+            else{
+                if(this.cbs[action]){
+                    this.cbs[action]();
+                }
+            }
+        })
+
+        this.update();
     }
     
     start(){
-        if( this.started ) return;
-        this.started = true;
-        this.process = fork(join(__dirname, "tray-process.js"));
-        this.process.on("message", msg => {
-            let {type, index} = JSON.parse(msg);
-            if( type=='click' && this.cbs[index] ){
-                this.cbs[index]();
-            }
-        })
-        this.process.on("error", e => {
-            console.error(e)
-            this.stop();
-        })
-
-        this.process.on("exit", e => {
-            this.stop();
-        })
-        this.cbs = [];
-        let i = -1;
-        this.process.send(JSON.stringify({type:"setup", name: this.name, menu: this.menu}, (key, value) => {
-            if( key != "callback" ) return value;
-            this.cbs[++i] = value;
-            return i;
-        }));
-        return 
+        this.process.send(JSON.stringify({
+            action: "start",
+            arguments: []
+        }))
     }
 
     stop(){
-        if( !this.started ) return;
-        this.started = false;
-        this.process.kill();
+        this.process.send(JSON.stringify({
+            action: "stop",
+            arguments: []
+        }))
+    }
+
+    update(){
+        this.process.send(JSON.stringify({
+            action: "update",
+            arguments: [this.icon, JSON.stringify(this.menu, (key, value) => {
+                if( key != "callback" ) return value;
+                this.cbs[++this.i] = value;
+                return this.i;
+            })]
+        }))  
     }
 }
 

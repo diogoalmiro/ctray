@@ -87,7 +87,10 @@ static void tray_update(struct tray *tray) {
   app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(tray->menu)));
 }
 
-static void tray_exit() { loop_result = -1; }
+static void tray_exit() {
+  app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
+  loop_result = -1;
+}
 
 #elif defined(TRAY_APPKIT)
 
