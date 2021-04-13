@@ -24,5 +24,5 @@ See [the example file](example.js) for a more complex example.
  - [ ] Improve documentation.
  - [x] ~~Test in other plattforms.~~
  - [ ] Create package.json Scripts.
- - [x] ~~Allow changing the menu dynamically.~~~
+ - [x] ~~Allow changing the menu dynamically.~~
  - [ ] Test in MacOS
