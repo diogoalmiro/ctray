@@ -1,6 +1,6 @@
 # CTray
 
-Cross-platform (tested on linux only for now) Node.js class to create system trays.
+Cross-platform (not tested on MacOS) Node.js class to create system trays.
 
 ## Installation
 
@@ -22,6 +22,7 @@ See [the example file](example.js) for a more complex example.
 ## Next steps
 
  - [ ] Improve documentation.
- - [ ] Test in other plattforms.
+ - [x] ~~Test in other plattforms.~~
  - [ ] Create package.json Scripts.
- - [ ] Allow changing the menu dynamically.
+ - [x] ~~Allow changing the menu dynamically.~~~
+ - [ ] Test in MacOS
