@@ -14,6 +14,7 @@ class TrayWorker : public Napi::AsyncWorker {
         ~TrayWorker() {}
 
         void Execute(){
+            tray_init(tray);
             // Tray Loop
             while(tray_loop(1) == 0){ };
         }
@@ -176,10 +177,7 @@ Napi::Value Update(const Napi::CallbackInfo& info){
 
     tray->menu = NapiArray2MenuStruct(env, menu);
     
-    if( wasNull ){
-        tray_init(tray);
-    }
-    else{
+    if( !wasNull ){
         tray_update(tray);
     }
     return env.Undefined();
