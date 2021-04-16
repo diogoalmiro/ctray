@@ -37,10 +37,12 @@ static GtkMenuShell *_tray_menu(tray_menu_t *m) {
     return menu;
 }
 
-
+int i = 0;
 class Tray : public NapiTray<Tray> {
     public:
-        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {}
+        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
+            sprintf(tray_application_id, "tray-linux-id-%d", i++);
+        }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
             Napi::Env env = info.Env();
