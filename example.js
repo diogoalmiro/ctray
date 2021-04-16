@@ -1,5 +1,5 @@
 let path = require('path');
-let Tray = require('./tray');
+let Tray = require('bindings')('tray');
 
 let item = (txt) => ({text:txt, callback: () => console.log(txt)})
 
@@ -27,4 +27,5 @@ let tray = new Tray(path.join(__dirname,"ctray.ico"), [
     }}
 ]);
 
-tray.start();
+tray.start()
+    .then(_ => console.log("Closed Tray without any error"));

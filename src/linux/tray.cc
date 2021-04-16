@@ -1,4 +1,5 @@
 #include "napitray.h"
+#include "trayloop.h"
 
 #include <gtk/gtk.h>
 #include <libappindicator/app-indicator.h>
@@ -39,37 +40,16 @@ static GtkMenuShell *_tray_menu(tray_menu_t *m) {
 
 class Tray : public NapiTray<Tray> {
     public:
-        /*static Napi::Object Init(Napi::Env env, Napi::Object exports){
-            Napi::Function func =
-                DefineClass(env, "Tray", {
-                    InstanceMethod<&Tray::Start>("start"),
-                    InstanceMethod<&Tray::Update>("update"),
-                    InstanceMethod<&Tray::Stop>("stop"),
-                    InstanceAccessor<&Tray::GetIcon, &Tray::SetIcon>("icon", napi_enumerable),
-                    InstanceAccessor<&Tray::GetMenu, &Tray::SetMenu>("menu", napi_enumerable)});
-            
-            Napi::FunctionReference* constructor = new Napi::FunctionReference();
-            *constructor = Napi::Persistent(func);
-            env.SetInstanceData(constructor);
-
-            return func;
-        }*/
-
         Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {}
 
-        /*Napi::Value Start(const Napi::CallbackInfo& info) override {
+        Napi::Value Start(const Napi::CallbackInfo& info) override {
             Napi::Env env = info.Env();
-            if( gtk_init_check(0, NULL) == FALSE ){
-                THROW("gtk_init_ceck Fail");
-                return env.Undefined();
-            }
-            this->indicator = app_indicator_new(this->tray_application_id, this->icon, APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-            app_indicator_set_status(this->indicator, APP_INDICATOR_STATUS_ACTIVE);
-            //this->Update();
-            return env.Undefined();
+            TrayLoop<Tray> *loop = new TrayLoop<Tray>(env, this);
+            loop->Queue();
+            return loop->GetPromise();
         }
 
-        /*Napi::Value Update(const Napi::CallbackInfo& info) override{
+        Napi::Value Update(const Napi::CallbackInfo& info) override{
             Napi::Env env = info.Env();
             app_indicator_set_icon(this->indicator, this->icon);
             app_indicator_set_menu(this->indicator, GTK_MENU(_tray_menu(this->menu)));
@@ -77,8 +57,24 @@ class Tray : public NapiTray<Tray> {
         }
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
+            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
+            loop_result = -1;
             return info[0].Env().Undefined();
-        }*/  
+        }
+
+        void Loop() override{
+            if (gtk_init_check(0, NULL) == FALSE) {
+                return;
+            }
+            indicator = app_indicator_new(tray_application_id, icon,
+                                APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
+            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+            app_indicator_set_icon(indicator, icon);
+            app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(menu)));
+            while( loop_result == 0 ) {
+                gtk_main_iteration_do(1);
+            }
+        }
 
     private:
         char tray_application_id[80] = "tray-linux-id";

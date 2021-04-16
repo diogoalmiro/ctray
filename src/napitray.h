@@ -51,14 +51,10 @@ tray_menu_t* NapiArray2TrayMenu(Napi::Env env, Napi::Array napimenu){
     return r;
 }
 
-void callbackCall(struct tray_menu *tray_menu){
-    auto callback = []( Napi::Env env, Napi::Function jsCallback) {
-        jsCallback.Call({});
-    };
+struct tscb{
+    Napi::ThreadSafeFunction callback;
+};
 
-    Napi::ThreadSafeFunction* ctx = (Napi::ThreadSafeFunction*) tray_menu->context;
-    ctx->BlockingCall( callback );   
-}
 
 void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
     if( !obj.Has("text") ) {
@@ -113,20 +109,25 @@ void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
             THROW("Expected \"callback\" property to be a function.");
             return;
         }
-        r->context = Napi::ThreadSafeFunction::New(
-            env,
-            obj.Get("callback").As<Napi::Function>(),
-            text,
-            0,
-            1,
-            []( Napi::Env ){});
-        r->cb = &callbackCall;
+        Napi::Function napicallback = obj.Get("callback").As<Napi::Function>();
+    
+        struct tscb *cb = new (struct tscb);
+        cb->callback = Napi::ThreadSafeFunction::New(env, napicallback, "click-callback", 0, 1); 
+        r->context = cb;
+        r->cb = [](tray_menu_t *ctx){
+            auto callback = [](Napi::Env env, Napi::Function jsCall){
+                jsCall.Call({});
+            };
+            struct tscb* tsf = (struct tscb*) ctx->context;
+            tsf->callback.BlockingCall( callback );
+        };
     }
     else{
         r->context = NULL;
         r->cb = NULL;
     }
 }
+
 template<typename T>
 class NapiTray : public Napi::ObjectWrap<T> {
     public:
@@ -134,6 +135,7 @@ class NapiTray : public Napi::ObjectWrap<T> {
             Napi::Function func =
                 NapiTray::DefineClass(env, "Tray", {
                     NapiTray::InstanceMethod("start", &T::Start),
+                    NapiTray::InstanceMethod("update", &T::Update),
                     NapiTray::InstanceMethod("stop", &T::Stop),
                     NapiTray::InstanceAccessor("icon", &T::GetIcon, &T::SetIcon),
                     NapiTray::InstanceAccessor("menu", &T::GetMenu, &T::SetMenu)});
@@ -189,7 +191,6 @@ class NapiTray : public Napi::ObjectWrap<T> {
 
             this->menu = NapiArray2TrayMenu(env, arr);
             napimenu = Napi::Reference<Napi::Array>::New(arr, 1);
-            //napimenu = arr;
         }
 
         Napi::Value GetMenu(const Napi::CallbackInfo& info){
@@ -197,23 +198,10 @@ class NapiTray : public Napi::ObjectWrap<T> {
         }
 
 
-        virtual Napi::Value Start(const Napi::CallbackInfo& info){
-            Napi::Env env = info.Env();
-            THROW("Not Implemented!");
-            return env.Undefined();
-        }
-        
-        virtual Napi::Value Stop(const Napi::CallbackInfo& info){
-            Napi::Env env = info.Env();
-            THROW("Not Implemented!");
-            return env.Undefined();
-        }
-        
-        virtual Napi::Value Update(const Napi::CallbackInfo& info){
-            Napi::Env env = info.Env();
-            THROW("Not Implemented!");
-            return env.Undefined();
-        }
+        virtual Napi::Value Start(const Napi::CallbackInfo& info) = 0;
+        virtual Napi::Value Stop(const Napi::CallbackInfo& info) = 0;
+        virtual Napi::Value Update(const Napi::CallbackInfo& info) = 0;
+        virtual void Loop() = 0;
 
     protected: 
         // Js representation (getter, setter)
@@ -221,9 +209,6 @@ class NapiTray : public Napi::ObjectWrap<T> {
 
         char* icon;
         tray_menu_t* menu;
-
-        void* context;
 };
-
 
 #endif
