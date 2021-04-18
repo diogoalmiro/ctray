@@ -6,7 +6,6 @@
 
 #define WM_TRAY_CALLBACK_MESSAGE (WM_USER + 1)
 #define ID_TRAY_FIRST 1000
-#define WC_TRAY_CLASS_NAME "TRAY"
 
 LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam,
                                        LPARAM lparam) {
@@ -81,9 +80,12 @@ static HMENU _tray_menu(struct tray_menu *m, UINT *id) {
   return hmenu;
 }
 
+int i = 0;
 class Tray : public NapiTray<Tray> {
     public:
-        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) { }
+        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
+          sprintf(tray_application_id, "tray-win-id-%d", i++);
+        }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
             Napi::Env env = info.Env();
@@ -97,6 +99,7 @@ class Tray : public NapiTray<Tray> {
             HMENU prevmenu = hmenu;
             UINT id = ID_TRAY_FIRST;
             hmenu = _tray_menu(menu, &id);
+            SetWindowLongPtr(hwnd,0, (LONG_PTR)&hmenu);
             SendMessage(hwnd, WM_INITMENUPOPUP, (WPARAM)hmenu, 0);
             HICON icon;
             ExtractIconEx(this->icon, 0, NULL, &icon, 1);
@@ -121,7 +124,7 @@ class Tray : public NapiTray<Tray> {
               DestroyMenu(hmenu);
             }
             PostQuitMessage(0);
-            UnregisterClass(WC_TRAY_CLASS_NAME, GetModuleHandle(NULL));
+            UnregisterClass(tray_application_id, GetModuleHandle(NULL));
             return info[0].Env().Undefined();
         }
 
@@ -131,13 +134,13 @@ class Tray : public NapiTray<Tray> {
             wc.cbSize = sizeof(WNDCLASSEX);
             wc.lpfnWndProc = _tray_wnd_proc;
             wc.hInstance = GetModuleHandle(NULL);
-            wc.lpszClassName = WC_TRAY_CLASS_NAME;
+            wc.lpszClassName = tray_application_id;
             wc.cbWndExtra = sizeof(HMENU*);
             if (!RegisterClassEx(&wc)) {
                 return;
             }
 
-            hwnd = CreateWindowEx(0, WC_TRAY_CLASS_NAME, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            hwnd = CreateWindowEx(0, tray_application_id, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             if (hwnd == NULL) {
                 return;
             }
@@ -185,6 +188,7 @@ class Tray : public NapiTray<Tray> {
     private:
         WNDCLASSEX wc;
         NOTIFYICONDATA nid;
+        char tray_application_id[80] = "tray-linux-id";
         HWND hwnd;
         HMENU hmenu = NULL;
 };
