@@ -4,6 +4,12 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#define WM_TRAY_CALLBACK_MESSAGE (WM_USER + 1)
+#define ID_TRAY_FIRST 1000
+#define WC_TRAY_CLASS_NAME "TRAY"
+
+HMENU hmenu = NULL;
+
 LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam,
                                        LPARAM lparam) {
   switch (msg) {
@@ -19,7 +25,7 @@ LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam,
       GetCursorPos(&p);
       SetForegroundWindow(hwnd);
       WORD cmd = TrackPopupMenu(hmenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON |
-                                           TPM_RETURNCMD | TPM_NONOTIFY,
+                                          TPM_RETURNCMD | TPM_NONOTIFY,
                                 p.x, p.y, 0, hwnd, NULL);
       SendMessage(hwnd, WM_COMMAND, cmd, 0);
       return 0;
@@ -78,9 +84,7 @@ static HMENU _tray_menu(struct tray_menu *m, UINT *id) {
 
 class Tray : public NapiTray<Tray> {
     public:
-        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
-            sprintf(tray_application_id, "tray-linux-id-%d", i++);
-        }
+        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) { }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
             Napi::Env env = info.Env();
@@ -93,10 +97,10 @@ class Tray : public NapiTray<Tray> {
             Napi::Env env = info.Env();
             HMENU prevmenu = hmenu;
             UINT id = ID_TRAY_FIRST;
-            hmenu = _tray_menu(tray->menu, &id);
+            hmenu = _tray_menu(menu, &id);
             SendMessage(hwnd, WM_INITMENUPOPUP, (WPARAM)hmenu, 0);
             HICON icon;
-            ExtractIconEx(tray->icon, 0, NULL, &icon, 1);
+            ExtractIconEx(this->icon, 0, NULL, &icon, 1);
             if (nid.hIcon) {
                 DestroyIcon(nid.hIcon);
             }
@@ -110,12 +114,12 @@ class Tray : public NapiTray<Tray> {
         }
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
-              Shell_NotifyIcon(NIM_DELETE, &nid);
+            Shell_NotifyIcon(NIM_DELETE, &nid);
             if (nid.hIcon != 0) {
-                DestroyIcon(nid.hIcon);
+              DestroyIcon(nid.hIcon);
             }
             if (hmenu != 0) {
-                DestroyMenu(hmenu);
+              DestroyMenu(hmenu);
             }
             PostQuitMessage(0);
             UnregisterClass(WC_TRAY_CLASS_NAME, GetModuleHandle(NULL));
@@ -130,12 +134,12 @@ class Tray : public NapiTray<Tray> {
             wc.hInstance = GetModuleHandle(NULL);
             wc.lpszClassName = WC_TRAY_CLASS_NAME;
             if (!RegisterClassEx(&wc)) {
-                return -1;
+                return;
             }
 
             hwnd = CreateWindowEx(0, WC_TRAY_CLASS_NAME, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             if (hwnd == NULL) {
-                return -1;
+                return;
             }
             UpdateWindow(hwnd);
 
@@ -146,10 +150,27 @@ class Tray : public NapiTray<Tray> {
             nid.uFlags = NIF_ICON | NIF_MESSAGE;
             nid.uCallbackMessage = WM_TRAY_CALLBACK_MESSAGE;
             Shell_NotifyIcon(NIM_ADD, &nid);
+            // First up
+            HMENU prevmenu = hmenu;
+            UINT id = ID_TRAY_FIRST;
+            hmenu = _tray_menu(menu, &id);
+            SendMessage(hwnd, WM_INITMENUPOPUP, (WPARAM)hmenu, 0);
+            HICON icon;
+            ExtractIconEx(this->icon, 0, NULL, &icon, 1);
+            if (nid.hIcon) {
+              DestroyIcon(nid.hIcon);
+            }
+            nid.hIcon = icon;
+            Shell_NotifyIcon(NIM_MODIFY, &nid);
+
+            if (prevmenu != NULL) {
+              DestroyMenu(prevmenu);
+            }
+
             // LOOP
             while(true){
                 MSG msg;
-                PeekMessage(&msg, NULL, 0, 0, PM_REMOVE);
+                GetMessage(&msg, NULL, 0, 0);
                 if (msg.message == WM_QUIT) {
                     break;
                 }
@@ -163,7 +184,7 @@ class Tray : public NapiTray<Tray> {
         WNDCLASSEX wc;
         NOTIFYICONDATA nid;
         HWND hwnd;
-        HMENU hmenu = NULL;
+        //HMENU hmenu = NULL;
 };
 
 
