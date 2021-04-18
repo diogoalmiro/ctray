@@ -8,8 +8,6 @@
 #define ID_TRAY_FIRST 1000
 #define WC_TRAY_CLASS_NAME "TRAY"
 
-HMENU hmenu = NULL;
-
 LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam,
                                        LPARAM lparam) {
   switch (msg) {
@@ -24,7 +22,8 @@ LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam,
       POINT p;
       GetCursorPos(&p);
       SetForegroundWindow(hwnd);
-      WORD cmd = TrackPopupMenu(hmenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON |
+      HMENU *hmenu = (HMENU*)GetWindowLongPtr(hwnd, 0);
+      WORD cmd = TrackPopupMenu(*hmenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON |
                                           TPM_RETURNCMD | TPM_NONOTIFY,
                                 p.x, p.y, 0, hwnd, NULL);
       SendMessage(hwnd, WM_COMMAND, cmd, 0);
@@ -36,8 +35,8 @@ LRESULT CALLBACK _tray_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam,
       MENUITEMINFO item;
       item.cbSize = sizeof(MENUITEMINFO);
       item.fMask = MIIM_ID | MIIM_DATA;
-
-      if (GetMenuItemInfo(hmenu, wparam, FALSE, &item)) {
+      HMENU *hmenu = (HMENU*)GetWindowLongPtr(hwnd, 0);
+      if (GetMenuItemInfo(*hmenu, wparam, FALSE, &item)) {
         struct tray_menu *menu = (struct tray_menu *)item.dwItemData;
         if (menu != NULL && menu->cb != NULL) {
           menu->cb(menu);
@@ -133,6 +132,7 @@ class Tray : public NapiTray<Tray> {
             wc.lpfnWndProc = _tray_wnd_proc;
             wc.hInstance = GetModuleHandle(NULL);
             wc.lpszClassName = WC_TRAY_CLASS_NAME;
+            wc.cbWndExtra = sizeof(HMENU*);
             if (!RegisterClassEx(&wc)) {
                 return;
             }
@@ -141,6 +141,8 @@ class Tray : public NapiTray<Tray> {
             if (hwnd == NULL) {
                 return;
             }
+            SetWindowLongPtr(hwnd,0, (LONG_PTR)&hmenu);
+
             UpdateWindow(hwnd);
 
             memset(&nid, 0, sizeof(nid));
@@ -184,7 +186,7 @@ class Tray : public NapiTray<Tray> {
         WNDCLASSEX wc;
         NOTIFYICONDATA nid;
         HWND hwnd;
-        //HMENU hmenu = NULL;
+        HMENU hmenu = NULL;
 };
 
 
