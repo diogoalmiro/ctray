@@ -79,7 +79,7 @@ class Tray : public NapiTray<Tray> {
         }
 
     private:
-        char tray_application_id[80] = "tray-linux-id";
+        char tray_application_id[80] = "tray-linux-id-nnn";
         AppIndicator *indicator = NULL;
         int loop_result = 0;
 };

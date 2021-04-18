@@ -188,7 +188,7 @@ class Tray : public NapiTray<Tray> {
     private:
         WNDCLASSEX wc;
         NOTIFYICONDATA nid;
-        char tray_application_id[80] = "tray-linux-id";
+        char tray_application_id[80] = "tray-win-id-nnn";
         HWND hwnd;
         HMENU hmenu = NULL;
 };
