@@ -5,6 +5,7 @@
 #include <gtk/gtk.h>
 #include <libappindicator/app-indicator.h>
 // See https://wiki.ubuntu.com/DesktopExperienceTeam/ApplicationIndicators
+// Reference https://stackoverflow.com/questions/27950493/safety-of-using-pthreads-in-gtk2-0-application#27990662
 
 GMainContext *context;
 
