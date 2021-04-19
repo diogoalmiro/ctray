@@ -1,9 +1,72 @@
 #include "napitray.h"
 #include "trayloop.h"
 
+#include <thread>
 #include <gtk/gtk.h>
 #include <libappindicator/app-indicator.h>
 // See https://wiki.ubuntu.com/DesktopExperienceTeam/ApplicationIndicators
+
+GMainContext *context;
+
+void _mainLoop(){
+    if( !gtk_init_check(0, NULL) ){
+        return;
+    }
+    context = g_main_context_default();
+    gtk_main();
+}
+
+std::thread mainLoop(_mainLoop);
+
+static gboolean start_tray(gpointer gtray);
+static gboolean update_tray(gpointer gtray);
+static gboolean stop_tray(gpointer gtray);
+
+int i = 0;
+class Tray : public NapiTray<Tray> {
+    public:
+        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
+            sprintf(tray_application_id, "tray-linux-id-%d", i++);
+        }
+
+        Napi::Value Start(const Napi::CallbackInfo& info) override {
+            Napi::Env env = info.Env();
+            GSource *source = g_idle_source_new();
+            g_source_set_callback(source, start_tray, this, NULL);
+            g_source_attach(source, context);
+            g_source_unref(source);
+            TrayLoop<Tray> *loop = new TrayLoop<Tray>(env, this);
+            loop->Queue();
+            return loop->GetPromise();
+        }
+
+        Napi::Value Update(const Napi::CallbackInfo& info) override{
+            Napi::Env env = info.Env();
+            GSource *source = g_idle_source_new();
+            g_source_set_callback(source, update_tray, this, NULL);
+            g_source_attach(source, context);
+            g_source_unref(source);
+
+            return env.Undefined();
+        }
+
+        Napi::Value Stop(const Napi::CallbackInfo& info) override{
+            loop_result = -1;
+            GSource *source = g_idle_source_new();
+            g_source_set_callback(source, stop_tray, this, NULL);
+            g_source_attach(source, context);
+            g_source_unref(source);
+            return info[0].Env().Undefined();
+        }
+
+        void Loop() override{
+            
+        }
+
+        char tray_application_id[80] = "tray-linux-id-nnn";
+        AppIndicator *indicator = NULL;
+        int loop_result = 0;
+};
 
 static void _tray_menu_cb(GtkMenuItem *item, gpointer data) {
     (void)item;
@@ -37,57 +100,34 @@ static GtkMenuShell *_tray_menu(tray_menu_t *m) {
     return menu;
 }
 
-int i = 0;
-class Tray : public NapiTray<Tray> {
-    public:
-        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
-            sprintf(tray_application_id, "tray-linux-id-%d", i++);
-        }
+static gboolean start_tray(gpointer gtray){
+    Tray *tray = (Tray*)gtray;
 
-        Napi::Value Start(const Napi::CallbackInfo& info) override {
-            Napi::Env env = info.Env();
-            TrayLoop<Tray> *loop = new TrayLoop<Tray>(env, this);
-            loop->Queue();
-            return loop->GetPromise();
-        }
+    tray->indicator = app_indicator_new(tray->tray_application_id, tray->icon,
+                            APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
+    app_indicator_set_status(tray->indicator, APP_INDICATOR_STATUS_ACTIVE);
+    app_indicator_set_icon(tray->indicator, tray->icon);
+    app_indicator_set_menu(tray->indicator, GTK_MENU(_tray_menu(tray->menu)));
 
-        Napi::Value Update(const Napi::CallbackInfo& info) override{
-            Napi::Env env = info.Env();
-            if(indicator != NULL){
-                app_indicator_set_icon(indicator, icon);
-                app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(menu)));
-            }
-            return env.Undefined();
-        }
+    return G_SOURCE_REMOVE;
+}
 
-        Napi::Value Stop(const Napi::CallbackInfo& info) override{
-            loop_result = -1;
-            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
-            return info[0].Env().Undefined();
-        }
+static gboolean update_tray(gpointer gtray){
+    Tray *tray = (Tray*)gtray;
 
-        void Loop() override{
-            if (gtk_init_check(0, NULL) == FALSE) {
-                return;
-            }
-            indicator = app_indicator_new(tray_application_id, icon,
-                                APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-            app_indicator_set_icon(indicator, icon);
-            app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(menu)));
-            while( loop_result == 0 ) {
-                gtk_main_iteration_do(1);
-            }
-            indicator = NULL;
-        }
+    app_indicator_set_icon(tray->indicator, tray->icon);
+    app_indicator_set_menu(tray->indicator, GTK_MENU(_tray_menu(tray->menu)));
 
-    private:
-        char tray_application_id[80] = "tray-linux-id-nnn";
-        AppIndicator *indicator = NULL;
-        int loop_result = 0;
-};
+    return G_SOURCE_REMOVE;
+}
 
+static gboolean stop_tray(gpointer gtray){
+    Tray *tray = (Tray*)gtray;
 
+    app_indicator_set_status(tray->indicator, APP_INDICATOR_STATUS_PASSIVE);
+
+    return G_SOURCE_REMOVE;
+}
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   return Tray::Init(env, exports);

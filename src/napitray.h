@@ -203,12 +203,13 @@ class NapiTray : public Napi::ObjectWrap<T> {
         virtual Napi::Value Update(const Napi::CallbackInfo& info) = 0;
         virtual void Loop() = 0;
 
+        char* icon;
+        tray_menu_t* menu;
+        
     protected: 
         // Js representation (getter, setter)
         Napi::Reference<Napi::Array> napimenu;
 
-        char* icon;
-        tray_menu_t* menu;
 };
 
 #endif
