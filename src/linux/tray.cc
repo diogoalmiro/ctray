@@ -1,6 +1,6 @@
 #include "napitray.h"
-#include "trayloop.h"
 
+#include "trayloop.h"
 #include <thread>
 #include <gtk/gtk.h>
 #include <libappindicator/app-indicator.h>
@@ -28,45 +28,51 @@ class Tray : public NapiTray<Tray> {
     public:
         Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
             sprintf(tray_application_id, "tray-linux-id-%d", i++);
+            pthread_mutex_init(&tray_lock, NULL);
+            pthread_cond_init(&signal, NULL);
         }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
-            Napi::Env env = info.Env();
             GSource *source = g_idle_source_new();
             g_source_set_callback(source, start_tray, this, NULL);
             g_source_attach(source, context);
             g_source_unref(source);
-            TrayLoop<Tray> *loop = new TrayLoop<Tray>(env, this);
+
+            TrayLoop<Tray> *loop = new TrayLoop<Tray>(info.Env(), this);
             loop->Queue();
+
             return loop->GetPromise();
         }
 
         Napi::Value Update(const Napi::CallbackInfo& info) override{
-            Napi::Env env = info.Env();
             GSource *source = g_idle_source_new();
             g_source_set_callback(source, update_tray, this, NULL);
             g_source_attach(source, context);
             g_source_unref(source);
-
-            return env.Undefined();
+            return info.Env().Undefined();
         }
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
-            loop_result = -1;
             GSource *source = g_idle_source_new();
             g_source_set_callback(source, stop_tray, this, NULL);
             g_source_attach(source, context);
             g_source_unref(source);
-            return info[0].Env().Undefined();
+
+            pthread_cond_signal(&signal);
+            return info.Env().Undefined();
         }
 
-        void Loop() override{
-            
+        void Loop(){
+            pthread_mutex_lock(&tray_lock);
+	        pthread_cond_wait(&signal, &tray_lock);
+            pthread_mutex_unlock(&tray_lock);
         }
 
         char tray_application_id[80] = "tray-linux-id-nnn";
         AppIndicator *indicator = NULL;
-        int loop_result = 0;
+        pthread_mutex_t tray_lock;
+        pthread_cond_t signal;
+
 };
 
 static void _tray_menu_cb(GtkMenuItem *item, gpointer data) {
@@ -109,7 +115,7 @@ static gboolean start_tray(gpointer gtray){
     app_indicator_set_status(tray->indicator, APP_INDICATOR_STATUS_ACTIVE);
     app_indicator_set_icon(tray->indicator, tray->icon);
     app_indicator_set_menu(tray->indicator, GTK_MENU(_tray_menu(tray->menu)));
-
+    
     return G_SOURCE_REMOVE;
 }
 
