@@ -53,14 +53,16 @@ class Tray : public NapiTray<Tray> {
 
         Napi::Value Update(const Napi::CallbackInfo& info) override{
             Napi::Env env = info.Env();
-            app_indicator_set_icon(this->indicator, this->icon);
-            app_indicator_set_menu(this->indicator, GTK_MENU(_tray_menu(this->menu)));
+            if(indicator != NULL){
+                app_indicator_set_icon(indicator, icon);
+                app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(menu)));
+            }
             return env.Undefined();
         }
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
-            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
             loop_result = -1;
+            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
             return info[0].Env().Undefined();
         }
 
@@ -76,6 +78,7 @@ class Tray : public NapiTray<Tray> {
             while( loop_result == 0 ) {
                 gtk_main_iteration_do(1);
             }
+            indicator = NULL;
         }
 
     private:
