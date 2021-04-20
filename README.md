@@ -1,12 +1,20 @@
+<p align="center">
+    <img src="ctray.svg" alt="CTray Logo" height="90">
+</p>
+
 # CTray
 
-Cross-platform (not tested on MacOS) Node.js class to create system trays.
+Cross-platform Node.js class to create system trays.
+
+**Note:** This package was not yet tested on MacOS [Se issue #2](https://github.com/diogoalmiro/ctray/issues/2)
 
 ## Installation
 
 ```$ npm install ctray```
 
-## Example Usage
+## Usage
+
+### Simple Example
 
 ```
 let Tray = require("ctray");
@@ -15,9 +23,43 @@ let tray = new Tray("path/to/icon", [
     {text: "Hello World!"},
     {text: "Quit", callback: _ => tray.stop()}
 ])
+
+tray.start().then( () => console.log("Tray Exited") )
 ```
 
 See [the example file](example.js) for a more complex example.
+
+### Constructor `new Tray(icon: String, menu: Array<String|Object>) : Tray`
+
+Creates an instance of the tray.
+
+The `icon` parameter is an absolute path to an `.ico` file.
+
+The `menu` parameter is an array with at least one element. Each element of the array can either be a String or an Object with the following format:
+
+```
+{
+    text: String,                    // Label of the element in the tray. Required
+    [checked: Boolean,]              // Item starts checked? defaults: false
+    [disabled: Boolean,]             // Item is disabled? defaults: false
+    [callback: Function,]            // Function without arguments to run on click.
+    [submenu: Array<String|Object>,] // Array With the same rules as menu
+}
+```
+
+### `tray#start() : Promise`
+
+Shows the tray, promise ends when the tray is closed.
+
+### `tray#update() : undefined`
+
+Updates tray after changes on `tray.menu` or `tray.icon`. 
+
+**Note:** It reacts to `tray.menu = ...`, **not updates inside the array** (e.g. `tray.menu[0].text = ...`
+
+### `tray#stop() : undefined`
+
+Stops the tray.
 
 ## Next steps
 
