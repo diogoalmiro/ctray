@@ -1,5 +1,5 @@
 let path = require('path');
-let Tray = require('bindings')('tray');
+let Tray = require('./tray');
 
 let item = (txt) => ({text:txt, callback: () => console.log(txt)})
 

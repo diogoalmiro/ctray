@@ -1,5 +1,5 @@
 let path = require('path');
-let Tray = require('bindings')('tray');
+let Tray = require('./tray');
 
 let item = (txt) => ({text:txt, callback: () => console.log(txt)})
 
@@ -41,7 +41,12 @@ let simpleTray = new Tray(path.join(__dirname,"ctray.ico"), [
             otherTray = null;
         }
     } },
-    { text: "Quit", callback: () => simpleTray.stop() }
+    { text: "Quit", callback: () => {
+        simpleTray.stop();
+        if( otherTray ){
+            otherTray.stop();
+        }
+    } }
 ]);
 
 simpleTray.start()
