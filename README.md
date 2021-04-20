@@ -1,5 +1,6 @@
 <p align="center">
     <img src="ctray.svg" alt="CTray Logo" height="90">
+    <img src="ctray-alert.svg" alt="CTray Logo" height="90">
 </p>
 
 # CTray
