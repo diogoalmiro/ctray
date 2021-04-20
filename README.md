@@ -46,6 +46,7 @@ The `menu` parameter is an array with at least one element. Each element of the 
     [submenu: Array<String|Object>,] // Array With the same rules as menu
 }
 ```
+Internaly a String will be converted to the object text specified and the default arguments (without a callback). 
 
 ### `tray#start() : Promise`
 
@@ -55,7 +56,7 @@ Shows the tray, promise ends when the tray is closed.
 
 Updates tray after changes on `tray.menu` or `tray.icon`. 
 
-**Note:** It reacts to `tray.menu = ...`, **not updates inside the array** (e.g. `tray.menu[0].text = ...`
+**Note:** It reacts to `tray.menu = ...`, **not updates inside the array** (e.g. `tray.menu[0].text = ...`)
 
 ### `tray#stop() : undefined`
 
