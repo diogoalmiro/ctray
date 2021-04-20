@@ -49,11 +49,11 @@ The `menu` parameter is an array with at least one element. Each element of the 
 ```
 Internaly a String will be converted to the object text specified and the default arguments (without a callback).
 
-When `text` is `"-"` the tray will create an separator in the tray. The other values of the item are ignored in this case.
+When `text` is `"-"` the tray will create a separator in the tray. The other values of the item are ignored in this case.
 
 ### `tray#start() : Promise`
 
-Shows the tray, promise ends when the tray is closed.
+Shows the tray, the promise is fulfilled when the tray closes.
 
 ### `tray#update() : undefined`
 
