@@ -7,7 +7,7 @@
 
 Cross-platform Node.js class to create system trays.
 
-**Note:** This package was not yet tested on MacOS [Se issue #2](https://github.com/diogoalmiro/ctray/issues/2)
+**Note:** This package was not yet tested on MacOS [See issue #2](https://github.com/diogoalmiro/ctray/issues/2)
 
 ## Installation
 
