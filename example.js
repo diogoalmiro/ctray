@@ -3,7 +3,6 @@ let Tray = require('./tray');
 
 let item = (txt) => ({text:txt, callback: () => console.log(txt)})
 
-
 let tray = new Tray(path.join(__dirname,"ctray.ico"), [
     "Tray Example",
     "-",
@@ -27,4 +26,5 @@ let tray = new Tray(path.join(__dirname,"ctray.ico"), [
     }}
 ]);
 
-tray.start();
+tray.start()
+    .then(_ => console.log("Tray Closed"));

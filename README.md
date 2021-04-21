@@ -1,12 +1,13 @@
 <p align="center">
     <img src="ctray.svg" alt="CTray Logo" height="90">
+    <img src="ctray-alert.svg" alt="CTray Logo" height="90">
 </p>
 
 # CTray
 
 Cross-platform Node.js class to create system trays.
 
-**Note:** This package was not yet tested on MacOS [Se issue #2](https://github.com/diogoalmiro/ctray/issues/2)
+**Note:** This package was not yet tested on MacOS [See issue #2](https://github.com/diogoalmiro/ctray/issues/2)
 
 ## Installation
 
@@ -24,7 +25,7 @@ let tray = new Tray("path/to/icon", [
     {text: "Quit", callback: _ => tray.stop()}
 ])
 
-tray.start().then( () => console.log("Tray Exited") )
+tray.start().then( () => console.log("Tray Closed") )
 ```
 
 See [the example file](example.js) for a more complex example.
@@ -46,11 +47,13 @@ The `menu` parameter is an array with at least one element. Each element of the 
     [submenu: Array<String|Object>,] // Array With the same rules as menu
 }
 ```
-Internaly a String will be converted to the object text specified and the default arguments (without a callback). 
+Internaly a String will be converted to the object text specified and the default arguments (without a callback).
+
+When `text` is `"-"` the tray will create a separator in the tray. The other values of the item are ignored in this case.
 
 ### `tray#start() : Promise`
 
-Shows the tray, promise ends when the tray is closed.
+Shows the tray, the promise is fulfilled when the tray closes.
 
 ### `tray#update() : undefined`
 
@@ -69,3 +72,8 @@ Stops the tray.
  - [ ] Create package.json Scripts.
  - [x] ~~Allow changing the menu dynamically.~~
  - [ ] Test in MacOS
+
+###### Notes to self
+
+ - Generate ico from svg command:
+   `$ convert -density 2048 -background transparent icon.svg -define icon:auto-resize -colors 256 icon.ico`
