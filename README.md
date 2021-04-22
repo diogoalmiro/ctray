@@ -43,8 +43,8 @@ type MenuItem = {
     text:      string,     // Label of the element in the tray. Required
     checked?:  boolean,    // Item starts checked? defaults: false
     disabled?: boolean,    // Item is disabled? defaults: false
-    callback:  () => void, // Function without arguments to run on click.
-    submenu:   MenuItem[], // Array With the same rules as menu
+    callback?: () => void, // Function without arguments to run on click.
+    submenu?:  MenuItem[], // Array With the same rules as menu
 }
 ```
 Internaly a String will be converted to the object text specified and the default arguments (without a callback).
