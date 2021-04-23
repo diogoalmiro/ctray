@@ -15,9 +15,11 @@ void _mainLoop(){
     }
     context = g_main_context_default();
     gtk_main();
+
 }
 
-std::thread mainLoop(_mainLoop);
+std::thread mainLoop;
+int trays = 0;
 
 static gboolean start_tray(gpointer gtray);
 static gboolean update_tray(gpointer gtray);
@@ -33,6 +35,11 @@ class Tray : public NapiTray<Tray> {
         }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
+            if(trays == 0){
+                mainLoop = std::thread(_mainLoop);
+            }
+            trays++;
+
             GSource *source = g_idle_source_new();
             g_source_set_callback(source, start_tray, this, NULL);
             g_source_attach(source, context);
@@ -59,6 +66,12 @@ class Tray : public NapiTray<Tray> {
             g_source_unref(source);
 
             pthread_cond_signal(&signal);
+
+            trays--;
+            if(trays==0){
+                gtk_main_quit();
+                mainLoop.join();
+            }
             return info.Env().Undefined();
         }
 

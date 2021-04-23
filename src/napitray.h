@@ -2,6 +2,7 @@
 #define _NAPITRAY_H
 
 #include <napi.h>
+#include "napitrayitem.h"
 
 #define THROW(error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
@@ -53,6 +54,7 @@ tray_menu_t* NapiArray2TrayMenu(Napi::Env env, Napi::Array napimenu){
 
 struct tscb{
     Napi::ThreadSafeFunction callback;
+    Napi::ObjectReference obj;
 };
 
 
@@ -113,13 +115,14 @@ void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
     
         struct tscb *cb = new (struct tscb);
         cb->callback = Napi::ThreadSafeFunction::New(env, napicallback, "click-callback", 0, 1); 
+        cb->obj = Napi::Persistent(obj);
         r->context = cb;
         r->cb = [](tray_menu_t *ctx){
-            auto callback = [](Napi::Env env, Napi::Function jsCall){
-                jsCall.Call({});
+            auto callback = [](Napi::Env env, Napi::Function jsCall, void* obj){
+                jsCall.Call({((Napi::ObjectReference*) obj)->Value()});
             };
             struct tscb* tsf = (struct tscb*) ctx->context;
-            tsf->callback.BlockingCall( callback );
+            tsf->callback.BlockingCall( &tsf->obj, callback );
         };
     }
     else{
@@ -132,6 +135,8 @@ template<typename T>
 class NapiTray : public Napi::ObjectWrap<T> {
     public:
         static Napi::Object Init(Napi::Env env, Napi::Object exports){
+            NapiTrayItem::Init(env, exports);
+
             Napi::Function func =
                 NapiTray::DefineClass(env, "Tray", {
                     NapiTray::InstanceMethod("start", &T::Start),
