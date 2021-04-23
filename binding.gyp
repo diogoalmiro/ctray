@@ -8,6 +8,12 @@
             "cflags_cc!": [ "-fno-exceptions" ],
             "cflags_cc" : ["-std=c++20"],
             "sources": [],
+            "xcode_settings" : {
+                'GCC_ENABLE_CPP_EXCEPTIONS':'YES',
+                'GCC_SYMBOLS_PRIVATE_EXTERN':'YES',
+                'CLANG_CXX_LIBRARY': 'libc++',
+                'MACOSX_DEPLOYMENT_TARGET': '10.7'
+            },
             "include_dirs": [
                 "src",
                 "<!@(node -p \"require('node-addon-api').include\")"

@@ -6,7 +6,7 @@
 
 static void menu_callback(id self, SEL cmd, id sender) {
   struct tray_menu *m =
-      (struct tray_menu *)objc_msgSend(objc_msgSend(sender, sel_registerName("representedObject")), 
+      (struct tray_menu *)((id(*)(id, SEL))objc_msgSend)(((id(*)(id, SEL))objc_msgSend)(sender, sel_registerName("representedObject")), 
                   sel_registerName("pointerValue"));
 
     if (m != NULL && m->cb != NULL) {
@@ -15,31 +15,31 @@ static void menu_callback(id self, SEL cmd, id sender) {
 }
 
 static id _tray_menu(struct tray_menu *m) {
-    id menu = objc_msgSend((id)objc_getClass("NSMenu"), sel_registerName("new"));
-    objc_msgSend(menu, sel_registerName("autorelease"));
-    objc_msgSend(menu, sel_registerName("setAutoenablesItems:"), false);
+    id menu = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMenu"), sel_registerName("new"));
+    ((id(*)(id, SEL))objc_msgSend)(menu, sel_registerName("autorelease"));
+    ((id(*)(id, SEL, bool))objc_msgSend)(menu, sel_registerName("setAutoenablesItems:"), false);
 
     for (; m != NULL && m->text != NULL; m++) {
       if (strcmp(m->text, "-") == 0) {
-        objc_msgSend(menu, sel_registerName("addItem:"), 
-          objc_msgSend((id)objc_getClass("NSMenuItem"), sel_registerName("separatorItem")));
+        ((id(*)(id, SEL, id))objc_msgSend)(menu, sel_registerName("addItem:"), 
+          ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMenuItem"), sel_registerName("separatorItem")));
       } else {
-        id menuItem = objc_msgSend((id)objc_getClass("NSMenuItem"), sel_registerName("alloc"));
-        objc_msgSend(menuItem, sel_registerName("autorelease"));
-        objc_msgSend(menuItem, sel_registerName("initWithTitle:action:keyEquivalent:"),
-                  objc_msgSend((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), m->text),
+        id menuItem = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSMenuItem"), sel_registerName("alloc"));
+        ((id(*)(id, SEL))objc_msgSend)(menuItem, sel_registerName("autorelease"));
+        ((id(*)(id, SEL, id, SEL, id))objc_msgSend)(menuItem, sel_registerName("initWithTitle:action:keyEquivalent:"),
+                  ((id(*)(id, SEL, const char*))objc_msgSend)((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), m->text),
                   sel_registerName("menuCallback:"),
-                  objc_msgSend((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), ""));
+                  ((id(*)(id, SEL, const char*))objc_msgSend)((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), ""));
   
-        objc_msgSend(menuItem, sel_registerName("setEnabled:"), (m->disabled ? false : true));
-          objc_msgSend(menuItem, sel_registerName("setState:"), (m->checked ? 1 : 0));
-          objc_msgSend(menuItem, sel_registerName("setRepresentedObject:"),
-            objc_msgSend((id)objc_getClass("NSValue"), sel_registerName("valueWithPointer:"), m));
+        ((id(*)(id, SEL, bool))objc_msgSend)(menuItem, sel_registerName("setEnabled:"), (m->disabled ? false : true));
+          ((id(*)(id, SEL, bool))objc_msgSend)(menuItem, sel_registerName("setState:"), (m->checked ? true : false));
+          ((id(*)(id, SEL, id))objc_msgSend)(menuItem, sel_registerName("setRepresentedObject:"),
+            ((id(*)(id, SEL, void*))objc_msgSend)((id)objc_getClass("NSValue"), sel_registerName("valueWithPointer:"), m));
   
-          objc_msgSend(menu, sel_registerName("addItem:"), menuItem);
+          ((id(*)(id, SEL, id))objc_msgSend)(menu, sel_registerName("addItem:"), menuItem);
   
           if (m->submenu != NULL) {
-            objc_msgSend(menu, sel_registerName("setSubmenu:forItem:"), _tray_menu(m->submenu), menuItem);
+            ((id(*)(id, SEL, id, id))objc_msgSend)(menu, sel_registerName("setSubmenu:forItem:"), _tray_menu(m->submenu), menuItem);
       }
     }
   }
@@ -49,7 +49,8 @@ static id _tray_menu(struct tray_menu *m) {
 
 class Tray : public NapiTray<Tray> {
     public:
-        Napi::Value Start(){
+        Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) { }
+        Napi::Value Start(const Napi::CallbackInfo& info) override{
             Napi::Env env = info.Env();
             TrayLoop<Tray> *loop = new TrayLoop<Tray>(env, this);
             loop->Queue();
@@ -58,24 +59,24 @@ class Tray : public NapiTray<Tray> {
 
         Napi::Value Update(const Napi::CallbackInfo& info) override{
             Napi::Env env = info.Env();
-            objc_msgSend(statusBarButton, sel_registerName("setImage:"), 
-                objc_msgSend((id)objc_getClass("NSImage"), sel_registerName("imageNamed:"), 
-                    objc_msgSend((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), icon)));
+            ((id(*)(id, SEL, id))objc_msgSend)(statusBarButton, sel_registerName("setImage:"), 
+                ((id(*)(id, SEL, id))objc_msgSend)((id)objc_getClass("NSImage"), sel_registerName("imageNamed:"), 
+                    ((id(*)(id, SEL, char*))objc_msgSend)((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), icon)));
 
-            objc_msgSend(statusItem, sel_registerName("setMenu:"), _tray_menu(menu));
+            ((id(*)(id, SEL, id))objc_msgSend)(statusItem, sel_registerName("setMenu:"), _tray_menu(menu));
             return env.Undefined();
         }
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
-            objc_msgSend(app, sel_registerName("terminate:"), app);
+            ((id(*)(id, SEL, id))objc_msgSend)(app, sel_registerName("terminate:"), app);
             return info[0].Env().Undefined();
         }
 
-        void Loop(){
-            pool = objc_msgSend((id)objc_getClass("NSAutoreleasePool"),
+        void Loop() override{
+            pool = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSAutoreleasePool"),
                           sel_registerName("new"));
   
-            objc_msgSend((id)objc_getClass("NSApplication"),
+            ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSApplication"),
                                 sel_registerName("sharedApplication"));
         
             Class trayDelegateClass = objc_allocateClassPair(objc_getClass("NSObject"), "Tray", 0);
@@ -83,43 +84,43 @@ class Tray : public NapiTray<Tray> {
             class_addMethod(trayDelegateClass, sel_registerName("menuCallback:"), (IMP)menu_callback, "v@:@");
             objc_registerClassPair(trayDelegateClass);
         
-            id trayDelegate = objc_msgSend((id)trayDelegateClass,
+            id trayDelegate = ((id(*)(id, SEL))objc_msgSend)((id)trayDelegateClass,
                                 sel_registerName("new"));
         
-            app = objc_msgSend((id)objc_getClass("NSApplication"),
+            app = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSApplication"),
                                 sel_registerName("sharedApplication"));
         
-            objc_msgSend(app, sel_registerName("setDelegate:"), trayDelegate);
+            ((id(*)(id, SEL, id))objc_msgSend)(app, sel_registerName("setDelegate:"), trayDelegate);
         
-            statusBar = objc_msgSend((id)objc_getClass("NSStatusBar"),
+            statusBar = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSStatusBar"),
                                 sel_registerName("systemStatusBar"));
         
-            statusItem = objc_msgSend(statusBar, sel_registerName("statusItemWithLength:"), -1.0);
+            statusItem = ((id(*)(id, SEL, float))objc_msgSend)(statusBar, sel_registerName("statusItemWithLength:"), -1.0);
         
-            objc_msgSend(statusItem, sel_registerName("retain"));
-            objc_msgSend(statusItem, sel_registerName("setHighlightMode:"), true);
-            statusBarButton = objc_msgSend(statusItem, sel_registerName("button"));
+            ((id(*)(id, SEL))objc_msgSend)(statusItem, sel_registerName("retain"));
+            ((id(*)(id, SEL, bool))objc_msgSend)(statusItem, sel_registerName("setHighlightMode:"), true);
+            statusBarButton = ((id(*)(id, SEL))objc_msgSend)(statusItem, sel_registerName("button"));
             
-              objc_msgSend(statusBarButton, sel_registerName("setImage:"), 
-                objc_msgSend((id)objc_getClass("NSImage"), sel_registerName("imageNamed:"), 
-                    objc_msgSend((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), icon)));
+              ((id(*)(id, SEL, id))objc_msgSend)(statusBarButton, sel_registerName("setImage:"), 
+                ((id(*)(id, SEL, id))objc_msgSend)((id)objc_getClass("NSImage"), sel_registerName("imageNamed:"), 
+                    ((id(*)(id, SEL, char*))objc_msgSend)((id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), icon)));
 
-            objc_msgSend(statusItem, sel_registerName("setMenu:"), _tray_menu(menu));
+            ((id(*)(id, SEL, id))objc_msgSend)(statusItem, sel_registerName("setMenu:"), _tray_menu(menu));
 
-            objc_msgSend(app, sel_registerName("activateIgnoringOtherApps:"), true);
+            ((id(*)(id, SEL, bool))objc_msgSend)(app, sel_registerName("activateIgnoringOtherApps:"), true);
 
             while(true){
-                    id until = objc_msgSend((id)objc_getClass("NSDate"), sel_registerName("distantFuture"));
+                    id until = ((id(*)(id, SEL))objc_msgSend)((id)objc_getClass("NSDate"), sel_registerName("distantFuture"));
             
-                id event = objc_msgSend(app, sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:"), 
+                id event = ((id(*)(id, SEL, long, id, id, bool))objc_msgSend)(app, sel_registerName("nextEventMatchingMask:untilDate:inMode:dequeue:"), 
                             ULONG_MAX, 
                             until, 
-                            objc_msgSend((id)objc_getClass("NSString"), 
+                            ((id(*)(id, SEL, const char*))objc_msgSend)((id)objc_getClass("NSString"), 
                             sel_registerName("stringWithUTF8String:"), 
                             "kCFRunLoopDefaultMode"), 
                             true);
                 if (event) {
-                    objc_msgSend(app, sel_registerName("sendEvent:"), event);
+                    ((id(*)(id, SEL, id))objc_msgSend)(app, sel_registerName("sendEvent:"), event);
                 }
             }
         }
@@ -129,7 +130,7 @@ class Tray : public NapiTray<Tray> {
         id statusBar;
         id statusItem;
         id statusBarButton;
-}
+};
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   return Tray::Init(env, exports);
