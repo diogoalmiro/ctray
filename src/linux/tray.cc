@@ -7,18 +7,6 @@
 // See https://wiki.ubuntu.com/DesktopExperienceTeam/ApplicationIndicators
 // Reference https://stackoverflow.com/questions/27950493/safety-of-using-pthreads-in-gtk2-0-application#27990662
 
-GMainContext *context;
-
-void _mainLoop(){
-    if( !gtk_init_check(0, NULL) ){
-        return;
-    }
-    context = g_main_context_default();
-    gtk_main();
-}
-
-std::thread mainLoop(_mainLoop);
-
 static gboolean start_tray(gpointer gtray);
 static gboolean update_tray(gpointer gtray);
 static gboolean stop_tray(gpointer gtray);
@@ -28,19 +16,11 @@ class Tray : public NapiTray<Tray> {
     public:
         Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
             sprintf(tray_application_id, "tray-linux-id-%d", i++);
-            pthread_mutex_init(&tray_lock, NULL);
-            pthread_cond_init(&signal, NULL);
         }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
-            GSource *source = g_idle_source_new();
-            g_source_set_callback(source, start_tray, this, NULL);
-            g_source_attach(source, context);
-            g_source_unref(source);
-
             TrayLoop<Tray> *loop = new TrayLoop<Tray>(info.Env(), this);
             loop->Queue();
-
             return loop->GetPromise();
         }
 
@@ -58,21 +38,26 @@ class Tray : public NapiTray<Tray> {
             g_source_set_callback(source, stop_tray, this, NULL);
             g_source_attach(source, context);
             g_source_unref(source);
-            pthread_cond_signal(&signal);
             ReleaseCallbacks();
+            gtk_main_quit();
             return info.Env().Undefined();
         }
 
+        GMainContext *context;
         void Loop(){
-            pthread_mutex_lock(&tray_lock);
-	        pthread_cond_wait(&signal, &tray_lock);
-            pthread_mutex_unlock(&tray_lock);
+            if( !gtk_init_check(0, NULL) ){
+                return;
+            }
+            context = g_main_context_default();
+            GSource *source = g_idle_source_new();
+            g_source_set_callback(source, start_tray, this, NULL);
+            g_source_attach(source, context);
+            g_source_unref(source);
+            gtk_main();
         }
 
         char tray_application_id[80] = "tray-linux-id-nnn";
         AppIndicator *indicator = NULL;
-        pthread_mutex_t tray_lock;
-        pthread_cond_t signal;
 
 };
 
