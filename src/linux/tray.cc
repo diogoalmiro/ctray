@@ -49,6 +49,7 @@ class Tray : public NapiTray<Tray> {
             g_source_set_callback(source, update_tray, this, NULL);
             g_source_attach(source, context);
             g_source_unref(source);
+            ReleaseOldCallbacks();
             return info.Env().Undefined();
         }
 
@@ -57,8 +58,8 @@ class Tray : public NapiTray<Tray> {
             g_source_set_callback(source, stop_tray, this, NULL);
             g_source_attach(source, context);
             g_source_unref(source);
-
             pthread_cond_signal(&signal);
+            ReleaseCallbacks();
             return info.Env().Undefined();
         }
 
