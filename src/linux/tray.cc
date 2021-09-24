@@ -15,6 +15,10 @@ int i = 0;
 class Tray : public NapiTray<Tray> {
     public:
         Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
+            Napi::Env env = info.Env();
+            if( !gtk_init_check(0, NULL) ){
+                THROW("GTK Init Failed.");
+            }
             sprintf(tray_application_id, "tray-linux-id-%d", i++);
         }
 
@@ -45,9 +49,6 @@ class Tray : public NapiTray<Tray> {
 
         GMainContext *context;
         void Loop(){
-            if( !gtk_init_check(0, NULL) ){
-                return;
-            }
             context = g_main_context_default();
             GSource *source = g_idle_source_new();
             g_source_set_callback(source, start_tray, this, NULL);

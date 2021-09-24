@@ -28,3 +28,30 @@ let tray = new Tray(path.join(__dirname,"ctray.ico"), [
 
 tray.start()
     .then(_ => console.log("Tray Closed"));
+
+
+let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"), [
+    "Tray2 Example",
+    "-",
+    item("Hello World!"),
+    item("Hello Tray2!"),
+    item("Hello C++!"),
+    {text: "More Hello's!", submenu: [
+        item("Hello NodeJS!"),
+        item("Hello VSCode!"),
+        item("Hello xfce-terminal!")
+    ]},
+    {text: "Update", callback: () => {
+        tray2.menu = [
+            "Good Bye!",
+            "-",
+            {text: "Quit", callback: () => {
+                    tray2.stop();
+                }}
+            ];
+        tray2.update();
+    }}
+]);
+
+tray2.start()
+    .then(_ => console.log("Tray2 Closed"));
