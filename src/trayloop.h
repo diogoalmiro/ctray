@@ -13,11 +13,20 @@ class TrayLoop : public Napi::AsyncWorker {
             deferred(Napi::Promise::Deferred::New(env)) {}
 
         void Execute(){
-            ctx->Loop();
+            try{
+                ctx->Loop();
+            }
+            catch(std::exception const& e){
+                SetError(e.what());
+            }
         }
 
         void OnOK(){
             deferred.Resolve(Env().Undefined());
+        }
+
+        void OnError(Napi::Error const& error){
+            deferred.Reject( error.Value() );
         }
 
         Napi::Promise GetPromise(){

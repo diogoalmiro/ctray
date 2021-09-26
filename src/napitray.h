@@ -55,7 +55,6 @@ struct tscb{
     Napi::ThreadSafeFunction callback;
 };
 
-
 void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
     if( !obj.Has("text") ) {
         THROW("Object requires \"text\" property.");
@@ -231,8 +230,8 @@ class NapiTray : public Napi::ObjectWrap<T> {
         virtual void Loop() = 0;
 
         char* icon;
-        tray_menu_t* menu;
-        tray_menu_t* old;
+        tray_menu_t* menu = NULL;
+        tray_menu_t* old = NULL;
         
     protected: 
         // Js representation (getter, setter)
