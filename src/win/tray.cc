@@ -79,12 +79,14 @@ static HMENU _tray_menu(struct tray_menu *m, UINT *id) {
   }
   return hmenu;
 }
-
+std::mutex mtx;
 int i = 0;
 class Tray : public NapiTray<Tray> {
     public:
         Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
+          mtx.lock();
           sprintf(tray_application_id, "tray-win-id-%d", i++);
+          mtx.unlock();
         }
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
@@ -98,9 +100,10 @@ class Tray : public NapiTray<Tray> {
             Napi::Env env = info.Env();
             HMENU prevmenu = hmenu;
             UINT id = ID_TRAY_FIRST;
+            ReleaseOldCallbacks();
             hmenu = _tray_menu(menu, &id);
             SetWindowLongPtr(hwnd,0, (LONG_PTR)&hmenu);
-            SendMessage(hwnd, WM_INITMENUPOPUP, (WPARAM)hmenu, 0);
+            PostMessageA(hwnd, WM_INITMENUPOPUP, (WPARAM)hmenu, 0);
             HICON icon;
             ExtractIconEx(this->icon, 0, NULL, &icon, 1);
             if (nid.hIcon) {
@@ -116,14 +119,15 @@ class Tray : public NapiTray<Tray> {
         }
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
+            PostMessageA(hwnd, WM_QUIT, (WPARAM)hmenu, 0);
             Shell_NotifyIcon(NIM_DELETE, &nid);
             if (nid.hIcon != 0) {
               DestroyIcon(nid.hIcon);
             }
+            ReleaseCallbacks();
             if (hmenu != 0) {
               DestroyMenu(hmenu);
             }
-            PostQuitMessage(0);
             UnregisterClass(tray_application_id, GetModuleHandle(NULL));
             return info[0].Env().Undefined();
         }
