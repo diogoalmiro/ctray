@@ -55,7 +55,6 @@ struct tscb{
     Napi::ThreadSafeFunction callback;
 };
 
-
 void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
     if( !obj.Has("text") ) {
         THROW("Object requires \"text\" property.");
@@ -128,6 +127,22 @@ void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
     }
 }
 
+void ClearTrayMenuCallbacks(tray_menu_t* menu){
+    if( !menu ) return;
+    int i = 0;
+    tray_menu_t curr;
+    while( menu[i].text ){
+        curr = menu[i];
+        if( curr.context ){
+            ((struct tscb *)curr.context)->callback.Release();
+        }
+        if( curr.submenu ){
+            ClearTrayMenuCallbacks(curr.submenu);
+        }
+        i++;
+    }
+}
+
 template<typename T>
 class NapiTray : public Napi::ObjectWrap<T> {
     public:
@@ -189,7 +204,8 @@ class NapiTray : public Napi::ObjectWrap<T> {
                 return;
             }
 
-            this->menu = NapiArray2TrayMenu(env, arr);
+            old = menu;
+            menu = NapiArray2TrayMenu(env, arr);
             napimenu = Napi::Reference<Napi::Array>::New(arr, 1);
         }
 
@@ -197,6 +213,16 @@ class NapiTray : public Napi::ObjectWrap<T> {
             return napimenu.Value();
         }
 
+        void ReleaseOldCallbacks(){
+            ClearTrayMenuCallbacks(old);
+            old = NULL;
+        }
+
+        void ReleaseCallbacks(){
+            ReleaseOldCallbacks();
+            old = menu;
+            ReleaseOldCallbacks();
+        }
 
         virtual Napi::Value Start(const Napi::CallbackInfo& info) = 0;
         virtual Napi::Value Stop(const Napi::CallbackInfo& info) = 0;
@@ -204,7 +230,8 @@ class NapiTray : public Napi::ObjectWrap<T> {
         virtual void Loop() = 0;
 
         char* icon;
-        tray_menu_t* menu;
+        tray_menu_t* menu = NULL;
+        tray_menu_t* old = NULL;
         
     protected: 
         // Js representation (getter, setter)
