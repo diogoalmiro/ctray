@@ -55,3 +55,14 @@ let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"), [
 
 tray2.start()
     .then(_ => console.log("Tray2 Closed"));
+
+
+    for(let i=0; i < 5; i++){
+        let c = i;
+        let tray = new Tray(path.join(__dirname,"ctray.ico"), [
+            { text: `Tray #${c}`, callback: () => console.log("Hello from tray", c) },
+            { text: "Close", callback: () => tray.stop() }
+        ])
+        tray.start().then(_ => console.log(`Tray ${c} closed.`)).catch(e => console.log(e))
+    }
+    
