@@ -6,7 +6,7 @@
             "ldflags": ["-g"],
             "cflags!": [ "-fno-exceptions" ],
             "cflags_cc!": [ "-fno-exceptions" ],
-            "cflags_cc" : ["-std=c++20"],
+            "cflags_cc" : ["-std=c++17"],
             "sources": [],
             "include_dirs": [
                 "src",
