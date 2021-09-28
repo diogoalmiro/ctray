@@ -7,10 +7,8 @@
 
 static GtkMenuShell *_tray_menu(tray_menu_t *m);
 
-std::thread gtkThread;
 std::mutex mtx;
 
-int running = 0;
 int i = 0;
 class Tray : public NapiTray<Tray> {
     public:
@@ -23,12 +21,6 @@ class Tray : public NapiTray<Tray> {
 
         Napi::Value Start(const Napi::CallbackInfo& info) override {
             TrayLoop<Tray> *loop = new TrayLoop<Tray>(info.Env(), this);
-            mtx.lock();
-            if( running == 0 ){
-                gtkThread = std::thread(gtk_main);
-            }
-            running++;
-            mtx.unlock();
             indicator = app_indicator_new(id,icon,APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
             app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
             app_indicator_set_icon(indicator, icon);
@@ -45,15 +37,7 @@ class Tray : public NapiTray<Tray> {
 
         Napi::Value Stop(const Napi::CallbackInfo& info) override{
             app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
-            ReleaseCallbacks();
-            mtx.lock();
-            running--;
-            if( running == 0 ){
-                gtk_main_quit();
-                gtkThread.join();
-
-            }
-            mtx.unlock();
+            ReleaseCallbacks();;
             stop.unlock();
             return info.Env().Undefined();
         }
@@ -100,11 +84,22 @@ static GtkMenuShell *_tray_menu(tray_menu_t *m) {
     return menu;
 }
 
+std::thread gtkThread;
+
+void QuitGtk(void *){
+    gtk_main_quit();
+    gtkThread.join();
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     if( !gtk_init_check(0, NULL) ){
         Napi::Error::New(env, "GTK Init Check Failed").ThrowAsJavaScriptException();
         return env.Null().As<Napi::Object>();
     }
+
+    gtkThread = std::thread(gtk_main);
+    napi_add_env_cleanup_hook( env, &QuitGtk, nullptr);
+
     return Tray::Init(env, exports);
 }
 

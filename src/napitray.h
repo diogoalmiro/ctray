@@ -159,7 +159,7 @@ class NapiTray : public Napi::ObjectWrap<T> {
                     NapiTray::InstanceMethod("stop", &T::Stop),
                     NapiTray::InstanceAccessor("icon", &T::GetIcon, &T::SetIcon),
                     NapiTray::InstanceAccessor("menu", &T::GetMenu, &T::SetMenu)});
-            
+            func.Set("MenuItem", NapiTrayItem::Init(env, exports));
             Napi::FunctionReference* constructor = new Napi::FunctionReference();
             *constructor = Napi::Persistent(func);
             env.SetInstanceData(constructor);
