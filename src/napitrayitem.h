@@ -6,7 +6,7 @@
 
 #define THROW(error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
-Napi::FunctionReference NapiTrayItemConstructor;
+Napi::FunctionReference *NapiTrayItemConstructor;
 
 class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
     public:
@@ -14,14 +14,16 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             Napi::Function func =
                 DefineClass(env, "TrayItem", {
                     InstanceMethod("click", &NapiTrayItem::Click),
+                    InstanceMethod("toString", &NapiTrayItem::ToString),
                     InstanceAccessor("text", &NapiTrayItem::GetText, &NapiTrayItem::SetText),
                     InstanceAccessor("checked", &NapiTrayItem::GetChecked, &NapiTrayItem::SetChecked),
                     InstanceAccessor("disabled", &NapiTrayItem::GetDisabled, &NapiTrayItem::SetDisabled),
                     InstanceAccessor("callback", &NapiTrayItem::GetCallback, &NapiTrayItem::SetCallback),
                     InstanceAccessor("submenu", &NapiTrayItem::GetSubmenu, &NapiTrayItem::SetSubmenu)});
-                
-            NapiTrayItemConstructor = Napi::Persistent(func);
-            env.SetInstanceData(&NapiTrayItemConstructor);
+            
+            NapiTrayItemConstructor = new Napi::FunctionReference(); 
+            *NapiTrayItemConstructor = Napi::Persistent(func);
+            env.SetInstanceData(NapiTrayItemConstructor);
 
             return func;
         }
@@ -103,11 +105,11 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 submenu = Napi::Array::New(info.Env(), array.Length());
                 for(uint32_t i = 0; i < array.Length(); i++){
                     Napi::Value arg = array.Get(i);
-                    if( arg.IsObject() && arg.As<Napi::Object>().Get(TrayItemSymbol).ToBoolean() ){
+                    if( arg.IsObject() && arg.As<Napi::Object>().InstanceOf(NapiTrayItemConstructor->Value()) ){
                         submenu[i] = arg;
                     }
                     else{
-                        submenu[i] = NapiTrayItemConstructor.New({ array.Get(i) });
+                        submenu[i] = NapiTrayItemConstructor->New({ array.Get(i) });
                     }
                 }
             }
@@ -118,6 +120,10 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             if( !callback.IsEmpty() ){
                 callback.MakeCallback(this->Value(), {}, nullptr);
             }
+        }
+
+        Napi::Value ToString(const Napi::CallbackInfo& info){
+            return text;
         }
 
     protected:
