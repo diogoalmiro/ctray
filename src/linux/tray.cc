@@ -2,10 +2,9 @@
 
 #include "trayloop.h"
 #include <thread>
+#include <iostream>
 #include <gtk/gtk.h>
 #include <libappindicator/app-indicator.h>
-
-static GtkMenuShell *_tray_menu(tray_menu_t *m);
 
 std::mutex mtx;
 
@@ -19,25 +18,36 @@ class Tray : public NapiTray<Tray> {
             mtx.unlock();
         }
 
-        Napi::Value Start(const Napi::CallbackInfo& info) override {
-            TrayLoop<Tray> *loop = new TrayLoop<Tray>(info.Env(), this);
-            indicator = app_indicator_new(id,icon,APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-            app_indicator_set_icon(indicator, icon);
-            app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(menu)));
+        Napi::Value Start(const Napi::CallbackInfo& info) {
             stop.lock();
+            if( indicatorPath ){
+                free(indicatorPath);
+            }
+            indicatorPath =(char*) calloc(icon.size()+1, sizeof(char));
+            strcpy(indicatorPath, icon.c_str());
+            
+            indicator = app_indicator_new(id,indicatorPath,APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
+            app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+            app_indicator_set_icon(indicator, indicatorPath);
+            app_indicator_set_menu(indicator, GTK_MENU(PrepareMenu(menuref.Value(), this)));
+            TrayLoop<Tray> *loop = new TrayLoop<Tray>(info.Env(), this);
             loop->Queue();
             return loop->GetPromise();
         }
 
-        Napi::Value Update(const Napi::CallbackInfo& info) override{
-            app_indicator_set_menu(indicator, GTK_MENU(_tray_menu(menu)));
+        Napi::Value Update(const Napi::CallbackInfo& info){
+            if( indicatorPath ){
+                free(indicatorPath);
+            }
+            indicatorPath =(char*) calloc(icon.size()+1, sizeof(char));
+            strcpy(indicatorPath, icon.c_str());
+            app_indicator_set_menu(indicator, GTK_MENU(PrepareMenu(menuref.Value(), this)));
             return info.Env().Undefined();
         }
 
-        Napi::Value Stop(const Napi::CallbackInfo& info) override{
+        Napi::Value Stop(const Napi::CallbackInfo& info){
             app_indicator_set_status(indicator, APP_INDICATOR_STATUS_PASSIVE);
-            ReleaseCallbacks();;
+            app_indicator_set_menu(indicator, GTK_MENU(PrepareMenu(Napi::Array::New(info.Env()), this)));
             stop.unlock();
             return info.Env().Undefined();
         }
@@ -46,42 +56,66 @@ class Tray : public NapiTray<Tray> {
             stop.lock();
             stop.unlock();
         }
+
     private:
-        AppIndicator* indicator;
+        AppIndicator* indicator = nullptr;
         std::mutex stop;
         char id[80] = "tray-indicator-id-nnnn";
+        char *indicatorPath = nullptr;
 };
 
-static void _tray_menu_cb(GtkMenuItem *item, gpointer data) {
-    (void)item;
-    tray_menu_t *m = (tray_menu_t*)data;
-    m->cb(m);
+struct callback_info
+{
+    Tray *origin;
+    NapiTrayItem *clicked;
+};
+
+
+void _tray_menu_cb(GtkMenuItem *item, gpointer data){
+    struct callback_info* c = (struct callback_info*) data;
+    c->clicked->Click();
 }
 
-static GtkMenuShell *_tray_menu(tray_menu_t *m) {
+void _tray_menu_destroy(GtkMenuItem *item, gpointer data){
+    ((struct callback_info*)data)->clicked->Destroy();
+}
+
+void* PrepareMenu(Napi::Array currMenu, void *origin){
     GtkMenuShell *menu = (GtkMenuShell *)gtk_menu_new();
-    for (; m != NULL && m->text != NULL; m++) {
-        GtkWidget *item;
-        if (strcmp(m->text, "-") == 0) {
-            item = gtk_separator_menu_item_new();
-        } else {
-            if (m->submenu != NULL) {
-                item = gtk_menu_item_new_with_label(m->text);
-                gtk_menu_item_set_submenu(GTK_MENU_ITEM(item),
-                                        GTK_WIDGET(_tray_menu(m->submenu)));
-            } else {
-                item = gtk_check_menu_item_new_with_label(m->text);
-                gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), !!m->checked);
-            }
-            gtk_widget_set_sensitive(item, !m->disabled);
-            if (m->cb != NULL) {
-                g_signal_connect(item, "activate", G_CALLBACK(_tray_menu_cb), m);
-            }
-        }
-        gtk_widget_show(item);
+    for(uint32_t i = 0; i < currMenu.Length(); i++){
+        GtkWidget *item = (GtkWidget*) NapiTrayItem::Unwrap(currMenu.Get(i).As<Napi::Object>())->PrepareItem(origin);
         gtk_menu_shell_append(menu, item);
     }
     return menu;
+}
+
+void* NapiTrayItem::PrepareItem(void *origin){
+    char* label = (char*) calloc(text.size()+1, sizeof(char));
+    struct callback_info *c = new struct callback_info();
+    c->clicked = this;
+    c->origin = (Tray*) origin;
+    strcpy(label, text.c_str());
+    GtkWidget *item = nullptr;
+    if( strcmp(label, "-") == 0 ){
+        item = gtk_separator_menu_item_new();
+    }
+    else{
+        Napi::Array menu = submenupointer.Value().As<Napi::Array>();
+        if( menu.Length() > 0 ){
+            item = gtk_menu_item_new_with_label(label);
+            gtk_menu_item_set_submenu(GTK_MENU_ITEM(item), GTK_WIDGET(PrepareMenu(menu, origin)));
+        }
+        else{
+            item = gtk_check_menu_item_new_with_label(label);
+            gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), !!checked);   
+        }
+        gtk_widget_set_sensitive(item, !disabled);
+        onClickCallback = Napi::ThreadSafeFunction::New(Env(), callback.Value(), "onClickCallback", 0, 1);
+        g_signal_connect(item, "activate", G_CALLBACK(_tray_menu_cb), c);
+        g_signal_connect(item, "destroy", G_CALLBACK(_tray_menu_destroy), c);
+    }
+    gtk_widget_show(item);
+    return item;
 }
 
 std::thread gtkThread;

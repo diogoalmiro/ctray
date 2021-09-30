@@ -6,29 +6,32 @@
 
 #define THROW(error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
-Napi::FunctionReference *NapiTrayItemConstructor;
-
 class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
     public:
+
+        static void OnClickCallBack(Napi::Env env, Napi::Function callback, NapiTrayItem *data){
+            if( !callback.IsEmpty() ){
+                callback.Call(data->Value(), {});
+            }
+        }
+
         static Napi::Object Init(Napi::Env env, Napi::Object exports){
             Napi::Function func =
                 DefineClass(env, "TrayItem", {
                     InstanceMethod("click", &NapiTrayItem::Click),
-                    InstanceMethod("toString", &NapiTrayItem::ToString),
                     InstanceAccessor("text", &NapiTrayItem::GetText, &NapiTrayItem::SetText),
                     InstanceAccessor("checked", &NapiTrayItem::GetChecked, &NapiTrayItem::SetChecked),
                     InstanceAccessor("disabled", &NapiTrayItem::GetDisabled, &NapiTrayItem::SetDisabled),
                     InstanceAccessor("callback", &NapiTrayItem::GetCallback, &NapiTrayItem::SetCallback),
                     InstanceAccessor("submenu", &NapiTrayItem::GetSubmenu, &NapiTrayItem::SetSubmenu)});
             
-            NapiTrayItemConstructor = new Napi::FunctionReference(); 
-            *NapiTrayItemConstructor = Napi::Persistent(func);
-            env.SetInstanceData(NapiTrayItemConstructor);
+            Napi::FunctionReference *constructor = new Napi::FunctionReference(); 
+            *constructor = Napi::Persistent(func);
 
             return func;
         }
 
-        NapiTrayItem(const Napi::CallbackInfo& info, const Napi::Value& arg) : Napi::ObjectWrap<NapiTrayItem>(info){
+        NapiTrayItem(const Napi::CallbackInfo& info, const Napi::Value& arg) : Napi::ObjectWrap<NapiTrayItem>(info) {
             Napi::Env env = info.Env();
             
             Napi::Object obj = info[0].As<Napi::Object>();
@@ -50,7 +53,7 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
         NapiTrayItem(const Napi::CallbackInfo& info) : NapiTrayItem(info, info[0]) {}
 
         Napi::Value GetText (const Napi::CallbackInfo& info){
-            return text;
+            return Napi::String::New(info.Env(), text);
         }
         void SetText(const Napi::CallbackInfo& info, const Napi::Value& arg){
             Napi::Env env = info.Env();
@@ -58,20 +61,20 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 THROW("'text' property must be a string");
                 return;
             }
-            text = arg.As<Napi::String>();
+            text = arg.As<Napi::String>().Utf8Value();
         }
         Napi::Value GetChecked (const Napi::CallbackInfo& info){
-            return checked;
+            return Napi::Boolean::New(info.Env(), checked);
         }
         void SetChecked(const Napi::CallbackInfo& info, const Napi::Value& arg){
             if( arg.IsUndefined() || arg.IsNull() ){
-                checked = Napi::Boolean::New(info.Env(), false);
+                checked = false;
                 return;
             }
             checked = arg.ToBoolean();
         }
         Napi::Value GetDisabled (const Napi::CallbackInfo& info){
-            return disabled;
+            return Napi::Boolean::New(info.Env(), disabled);
         }
         void SetDisabled(const Napi::CallbackInfo& info, const Napi::Value& arg){
             if( arg.IsUndefined() || arg.IsNull() ){
@@ -86,10 +89,10 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
         void SetCallback(const Napi::CallbackInfo& info, const Napi::Value& arg){
             if( !arg.IsFunction() ){
                 Napi::Function f = Napi::Function();
-                callback = Napi::Persistent( f );
+                callback = Napi::Persistent(f);
             }
             else{
-                callback = Napi::Persistent( arg.As<Napi::Function>() );
+                callback = Napi::Persistent(arg.As<Napi::Function>());
             }
         }
         Napi::Value GetSubmenu(const Napi::CallbackInfo& info){
@@ -102,14 +105,15 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             }
             else{
                 Napi::Array array = arg.As<Napi::Array>();
+                Napi::Function constructor = info.Env().GetInstanceData<Napi::FunctionReference>()->Value().Get("MenuItem").As<Napi::Function>();
                 submenu = Napi::Array::New(info.Env(), array.Length());
                 for(uint32_t i = 0; i < array.Length(); i++){
                     Napi::Value arg = array.Get(i);
-                    if( arg.IsObject() && arg.As<Napi::Object>().InstanceOf(NapiTrayItemConstructor->Value()) ){
+                    if( arg.IsObject() && arg.As<Napi::Object>().InstanceOf(constructor) ){
                         submenu[i] = arg;
                     }
                     else{
-                        submenu[i] = NapiTrayItemConstructor->New({ array.Get(i) });
+                        submenu[i] = constructor.New({ array.Get(i) });
                     }
                 }
             }
@@ -117,21 +121,26 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
         }
 
         void Click(const Napi::CallbackInfo& info){
-            if( !callback.IsEmpty() ){
-                callback.MakeCallback(this->Value(), {}, nullptr);
-            }
+            Click();
         }
 
-        Napi::Value ToString(const Napi::CallbackInfo& info){
-            return text;
+        void Click(){
+            onClickCallback.BlockingCall( this, OnClickCallBack);
         }
 
-    protected:
-        Napi::String text;
-        Napi::Boolean checked;
-        Napi::Boolean disabled;
-        Napi::Reference<Napi::Array> submenupointer;
+        void* PrepareItem(void *origin);
+
+        void Destroy(){
+            onClickCallback.Release();
+        }
+        
+        Napi::ThreadSafeFunction onClickCallback;
+        std::string text;
+        bool checked;
+        bool disabled;
         Napi::FunctionReference callback;
+        Napi::Reference<Napi::Array> submenupointer;
+        void* itemPointer = nullptr;
 };
 
 #endif
