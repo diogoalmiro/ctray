@@ -6,13 +6,13 @@
 
 #define THROW(error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
+#define EMIT(event_name, ...) info.This().As<Napi::Object>().Get("emit").As<Napi::Function>().Call(info.This(), {Napi::String::New(info.Env(), event_name), __VA_ARGS__})
+
 class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
     public:
 
-        static void OnClickCallBack(Napi::Env env, Napi::Function callback, NapiTrayItem *data){
-            if( !callback.IsEmpty() ){
-                callback.Call(data->Value(), {});
-            }
+        static void OnClickCallBack(Napi::Env env, Napi::Function emitter, NapiTrayItem *data){
+            emitter.Call(data->Value(), {Napi::String::New(env, "click")});
         }
 
         static Napi::Object Init(Napi::Env env, Napi::Object exports){
@@ -25,6 +25,12 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                     InstanceAccessor("callback", &NapiTrayItem::GetCallback, &NapiTrayItem::SetCallback),
                     InstanceAccessor("submenu", &NapiTrayItem::GetSubmenu, &NapiTrayItem::SetSubmenu)});
             
+            // Tray extends EventEmitter
+            Napi::Function Events = env.Global().As<Napi::Object>().Get("require").As<Napi::Function>().Call(env.Global(), {Napi::String::New(env, "events")}).As<Napi::Function>();
+            Napi::Function SetPrototype = env.Global().Get("Object").As<Napi::Object>().Get("setPrototypeOf").As<Napi::Function>();
+            
+            SetPrototype.Call(env.Global(), {func.Get("prototype"), Events.Get("prototype")});
+
             Napi::FunctionReference *constructor = new Napi::FunctionReference(); 
             *constructor = Napi::Persistent(func);
 
@@ -43,11 +49,14 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 THROW("use new MenuItem(string) or new MenuItem(object)");
                 return;
             }
+            Napi::Function Emit = Value().Get("emit").As<Napi::Function>();
+            onClickCallback = Napi::ThreadSafeFunction::New(env, Emit, "emit-click", 0, 1);
+            
             SetText(info, obj.Get("text"));
             SetChecked(info, obj.Get("checked"));
             SetDisabled(info, obj.Get("disabled"));
-            SetCallback(info, obj.Get("callback"));
             SetSubmenu(info, obj.Get("submenu"));
+            SetCallback(info, obj.Get("callback"));
         }
 
         NapiTrayItem(const Napi::CallbackInfo& info) : NapiTrayItem(info, info[0]) {}
@@ -62,6 +71,7 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 return;
             }
             text = arg.As<Napi::String>().Utf8Value();
+            EMIT("update", Napi::String::New(env, "text"));
         }
         Napi::Value GetChecked (const Napi::CallbackInfo& info){
             return Napi::Boolean::New(info.Env(), checked);
@@ -72,6 +82,7 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 return;
             }
             checked = arg.ToBoolean();
+            EMIT("update", Napi::String::New(info.Env(), "checked"));
         }
         Napi::Value GetDisabled (const Napi::CallbackInfo& info){
             return Napi::Boolean::New(info.Env(), disabled);
@@ -82,17 +93,27 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 return;
             }
             disabled = arg.ToBoolean();
+            EMIT("update", Napi::String::New(info.Env(), "disabled"));
         }
         Napi::Value GetCallback (const Napi::CallbackInfo& info){
             return callback.Value();
         }
         void SetCallback(const Napi::CallbackInfo& info, const Napi::Value& arg){
+            Napi::Object This = info.This().As<Napi::Object>();
+            Napi::Function on = This.Get("on").As<Napi::Function>();
+            Napi::Function off = This.Get("off").As<Napi::Function>();
+            
+            if( !callback.IsEmpty() ){
+                off.Call(info.This(), {Napi::String::New(info.Env(), "click"), callback.Value()});
+            }
+
             if( !arg.IsFunction() ){
                 Napi::Function f = Napi::Function();
                 callback = Napi::Persistent(f);
             }
             else{
                 callback = Napi::Persistent(arg.As<Napi::Function>());
+                on.Call(info.This(), {Napi::String::New(info.Env(), "click"), callback.Value()});
             }
         }
         Napi::Value GetSubmenu(const Napi::CallbackInfo& info){
@@ -118,10 +139,11 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 }
             }
             submenupointer = Napi::Persistent(submenu);
+            EMIT("update", Napi::String::New(info.Env(), "submenu"));
         }
 
         void Click(const Napi::CallbackInfo& info){
-            Click();
+            EMIT("click", NULL);
         }
 
         void Click(){
