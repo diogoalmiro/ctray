@@ -10,6 +10,9 @@
 
 #define EMIT(event_name, ...) info.This().As<Napi::Object>().Get("emit").As<Napi::Function>().Call(info.This(), {Napi::String::New(info.Env(), event_name), __VA_ARGS__})
 
+
+Napi::FunctionReference NapiTrayItemConstructor;
+
 class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
     public:
         static Napi::Object Init(Napi::Env env, Napi::Object exports){
@@ -26,8 +29,10 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             Napi::Function EventEmitter = env.Global().Get("EventEmitter").As<Napi::Function>();
             func.Get("prototype").As<Napi::Object>().Set("__proto__", EventEmitter.Get("prototype"));
 
-            Napi::FunctionReference *constructor = new Napi::FunctionReference(); 
-            *constructor = Napi::Persistent(func);
+            /*Napi::FunctionReference *constructor = new Napi::FunctionReference(); 
+            *constructor = Napi::Persistent(func);*/
+
+            NapiTrayItemConstructor = Napi::Persistent(func);
 
             return func;
         }
@@ -59,21 +64,13 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
         }
         void SetText(const Napi::CallbackInfo& info, const Napi::Value& arg){
             Napi::Env env = info.Env();
-            if( !arg.IsString() ){
-                THROW("'text' property must be a string");
-                return;
-            }
-            text = arg.As<Napi::String>().Utf8Value();
+            text = arg.ToString().Utf8Value();
             EMIT("update", Napi::String::New(env, "text"));
         }
         Napi::Value GetChecked (const Napi::CallbackInfo& info){
             return Napi::Boolean::New(info.Env(), checked);
         }
         void SetChecked(const Napi::CallbackInfo& info, const Napi::Value& arg){
-            if( arg.IsUndefined() || arg.IsNull() ){
-                checked = false;
-                return;
-            }
             checked = arg.ToBoolean();
             EMIT("update", Napi::String::New(info.Env(), "checked"));
         }
@@ -81,10 +78,6 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             return Napi::Boolean::New(info.Env(), disabled);
         }
         void SetDisabled(const Napi::CallbackInfo& info, const Napi::Value& arg){
-            if( arg.IsUndefined() || arg.IsNull() ){
-                disabled = Napi::Boolean::New(info.Env(), false);
-                return;
-            }
             disabled = arg.ToBoolean();
             EMIT("update", Napi::String::New(info.Env(), "disabled"));
         }
@@ -119,7 +112,7 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             }
             else{
                 Napi::Array array = arg.As<Napi::Array>();
-                Napi::Function constructor = info.Env().GetInstanceData<Napi::FunctionReference>()->Value().Get("TrayItem").As<Napi::Function>();
+                Napi::Function constructor = NapiTrayItemConstructor.Value();
                 submenu = Napi::Array::New(info.Env(), array.Length());
                 for(uint32_t i = 0; i < array.Length(); i++){
                     Napi::Value arg = array.Get(i);

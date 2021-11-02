@@ -30,13 +30,14 @@ class Tray : public NapiTray<Tray> {
             }
 
             NapiTrayItem *item = (NapiTrayItem*) info.Data();
-            if( !item->itemPointer ){
-                return;
-            }
+            Tray *t = (Tray*) g_object_get_data(G_OBJECT(item->itemPointer), "originPointer");
 
             std::string updated = info[0].As<Napi::String>().Utf8Value();
-            std::cout << "update " << updated << "\n";
-            
+            bool separ = GTK_IS_SEPARATOR_MENU_ITEM(item->itemPointer);
+            bool check = GTK_IS_CHECK_MENU_ITEM(item->itemPointer);
+            bool menui = GTK_IS_MENU_ITEM(item->itemPointer);
+            printf("updated item %d %d %d\n", separ, check, menui);
+
             if( updated.compare("text") == 0 ){
                 if( GTK_IS_SEPARATOR_MENU_ITEM(item->itemPointer) ){
                     item->text = "-";
@@ -55,13 +56,7 @@ class Tray : public NapiTray<Tray> {
             }
             else if( updated.compare("submenu") == 0 ){
                 if( GTK_IS_MENU_ITEM(item->itemPointer) ){
-                    void *origin = g_object_get_data(G_OBJECT(item->itemPointer), "originPointer");
-                    if( origin ){
-                        gtk_menu_item_set_submenu(GTK_MENU_ITEM(item->itemPointer), GTK_WIDGET(PrepareMenu(info, item->submenupointer.Value(), origin)));
-                    }
-                    else{
-                        item->submenupointer = Napi::Persistent(Napi::Array::New(info.Env(), 0));
-                    }
+                    gtk_menu_item_set_submenu(GTK_MENU_ITEM(item->itemPointer), GTK_WIDGET(PrepareMenu(info, item->submenupointer.Value(), t)));
                 }
                 else{
                     item->submenupointer = Napi::Persistent(Napi::Array::New(info.Env(), 0));
@@ -152,8 +147,7 @@ void* NapiTrayItem::PrepareItem(const Napi::CallbackInfo& info, void *origin){
     c->clicked = this;
     c->origin = (Tray*) origin;
 
-    GtkWidget *item = gtk_menu_item_new();
-    g_object_set_data(G_OBJECT(item), "originPointer", nullptr);
+    GtkWidget *item;
     if( text.compare("-") == 0 ){
         item = gtk_separator_menu_item_new();
     }
@@ -162,7 +156,6 @@ void* NapiTrayItem::PrepareItem(const Napi::CallbackInfo& info, void *origin){
         if( menu.Length() > 0 ){
             item = gtk_menu_item_new_with_label(text.c_str());
             gtk_menu_item_set_submenu(GTK_MENU_ITEM(item), GTK_WIDGET(PrepareMenu(info, menu, c->origin)));
-            g_object_set_data(G_OBJECT(item), "originPointer", origin);
         }
         else{
             item = gtk_check_menu_item_new_with_label(text.c_str());
@@ -172,6 +165,7 @@ void* NapiTrayItem::PrepareItem(const Napi::CallbackInfo& info, void *origin){
         gtk_widget_set_sensitive(item, !disabled);
     }
     gtk_widget_show(item);
+    g_object_set_data(G_OBJECT(item), "originPointer", origin);
     itemPointer = item;
     return item;
 }

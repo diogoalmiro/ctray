@@ -33,7 +33,7 @@ class NapiTray : public Napi::ObjectWrap<T> {
             func.Get("prototype").As<Napi::Object>().Set("__proto__", EventEmitter.Get("prototype"));
             
             // Add reference to TrayItem class
-            func.Set("TrayItem", NapiTrayItem::Init(env, exports));
+            NapiTrayItem::Init(env, exports);
             
 
 
@@ -118,7 +118,7 @@ class NapiTray : public Napi::ObjectWrap<T> {
             }
             Napi::Array menu = Napi::Array::New(env, arr.Length());
     
-            Napi::Function constructor = info.This().As<Napi::Object>().Get("constructor").As<Napi::Object>().Get("TrayItem").As<Napi::Function>();
+            Napi::Function constructor = NapiTrayItemConstructor.Value();
             for(uint32_t i = 0; i < arr.Length(); i++){
                 Napi::Value arg = arr.Get(i);
                 if( arg.IsObject() && arg.As<Napi::Object>().InstanceOf(constructor) ){
@@ -130,7 +130,7 @@ class NapiTray : public Napi::ObjectWrap<T> {
 
                 menu.Get(i).As<Napi::Object>()
                     .Get("on").As<Napi::Function>()
-                    .Call(menu.Get(i), {Napi::String::New(info.Env(), "update"), Napi::Function::New<T::OnTrayItemUpdate>(info.Env(), nullptr, this)});
+                    .Call(menu.Get(i), {Napi::String::New(info.Env(), "update"), Napi::Function::New<T::OnTrayItemUpdate>(info.Env(), nullptr, NapiTrayItem::Unwrap(menu.Get(i).As<Napi::Object>()))});
             }
             menuref = Napi::Persistent(menu);
             EMIT("update", Napi::String::New(env, "menu"));
