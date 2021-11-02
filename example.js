@@ -3,9 +3,9 @@ let Tray = require('./tray');
 
 let item = (txt) => ({text:txt, callback: function(o){console.log(this, o, txt)}})
 
-let tray = new Tray(path.join(__dirname,"ctray.ico"), [
-    "Tray Example",
-    "-",
+let tray = new Tray(path.join(__dirname,"ctray.ico"));
+
+tray.menu = ["Tray Example",
     item("Hello World!"),
     item("Hello Tray!"),
     item("Hello C++!"),
@@ -19,18 +19,14 @@ let tray = new Tray(path.join(__dirname,"ctray.ico"), [
             "Good Bye!",
             "-",
             {text: "Quit", callback: () => {
-                    tray.stop();
+                    tray.close();
                 }}
             ];
-        tray.update();
     }}
-]);
+];
+let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"));
 
-tray.start()
-    .then(_ => console.log("Tray Closed"));
-
-
-let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"), [
+tray2.menu = [
     "Tray2 Example",
     "-",
     item("Hello World!"),
@@ -46,23 +42,18 @@ let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"), [
             "Good Bye!",
             "-",
             {text: "Quit", callback: () => {
-                    tray2.stop();
+                    tray2.close();
                 }}
             ];
-        tray2.update();
     }}
-]);
-
-tray2.start()
-    .then(_ => console.log("Tray2 Closed"));
+];
 
 
     for(let i=0; i < 5; i++){
         let c = i;
-        let tray = new Tray(path.join(__dirname,"ctray.ico"), [
+        let tray = new Tray(path.join(__dirname,"ctray.ico"))
+        tray.menu = [
             { text: `Tray #${c}`, callback: () => console.log("Hello from tray", c) },
-            { text: "Close", callback: () => tray.stop() }
-        ])
-        tray.start().then(_ => console.log(`Tray ${c} closed.`)).catch(e => console.log(e))
+            { text: "Close", callback: () => tray.close() }
+        ]
     }
-    

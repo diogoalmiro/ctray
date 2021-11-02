@@ -1,6 +1,8 @@
 #ifndef _NAPITRAYITEM_H
 #define _NAPITRAYITEM_H
 
+#include <iostream>
+
 #include <napi.h>
 #include <stdlib.h>
 
@@ -10,11 +12,6 @@
 
 class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
     public:
-
-        static void OnClickCallBack(Napi::Env env, Napi::Function emitter, NapiTrayItem *data){
-            emitter.Call(data->Value(), {Napi::String::New(env, "click")});
-        }
-
         static Napi::Object Init(Napi::Env env, Napi::Object exports){
             Napi::Function func =
                 DefineClass(env, "TrayItem", {
@@ -24,12 +21,10 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                     InstanceAccessor("disabled", &NapiTrayItem::GetDisabled, &NapiTrayItem::SetDisabled),
                     InstanceAccessor("callback", &NapiTrayItem::GetCallback, &NapiTrayItem::SetCallback),
                     InstanceAccessor("submenu", &NapiTrayItem::GetSubmenu, &NapiTrayItem::SetSubmenu)});
-            
-            // Tray extends EventEmitter
-            Napi::Function Events = env.Global().As<Napi::Object>().Get("require").As<Napi::Function>().Call(env.Global(), {Napi::String::New(env, "events")}).As<Napi::Function>();
-            Napi::Function SetPrototype = env.Global().Get("Object").As<Napi::Object>().Get("setPrototypeOf").As<Napi::Function>();
-            
-            SetPrototype.Call(env.Global(), {func.Get("prototype"), Events.Get("prototype")});
+
+            // TrayItem extends EventEmitter
+            Napi::Function EventEmitter = env.Global().Get("EventEmitter").As<Napi::Function>();
+            func.Get("prototype").As<Napi::Object>().Set("__proto__", EventEmitter.Get("prototype"));
 
             Napi::FunctionReference *constructor = new Napi::FunctionReference(); 
             *constructor = Napi::Persistent(func);
@@ -49,8 +44,6 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
                 THROW("use new MenuItem(string) or new MenuItem(object)");
                 return;
             }
-            Napi::Function Emit = Value().Get("emit").As<Napi::Function>();
-            onClickCallback = Napi::ThreadSafeFunction::New(env, Emit, "emit-click", 0, 1);
             
             SetText(info, obj.Get("text"));
             SetChecked(info, obj.Get("checked"));
@@ -126,7 +119,7 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             }
             else{
                 Napi::Array array = arg.As<Napi::Array>();
-                Napi::Function constructor = info.Env().GetInstanceData<Napi::FunctionReference>()->Value().Get("MenuItem").As<Napi::Function>();
+                Napi::Function constructor = info.Env().GetInstanceData<Napi::FunctionReference>()->Value().Get("TrayItem").As<Napi::Function>();
                 submenu = Napi::Array::New(info.Env(), array.Length());
                 for(uint32_t i = 0; i < array.Length(); i++){
                     Napi::Value arg = array.Get(i);
@@ -143,20 +136,11 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
         }
 
         void Click(const Napi::CallbackInfo& info){
-            EMIT("click", NULL);
+            info.This().As<Napi::Object>().Get("emit").As<Napi::Function>().Call(info.This(), {Napi::String::New(info.Env(), "click")});
         }
 
-        void Click(){
-            onClickCallback.BlockingCall( this, OnClickCallBack);
-        }
-
-        void* PrepareItem(void *origin);
-
-        void Destroy(){
-            onClickCallback.Release();
-        }
+        void* PrepareItem(const Napi::CallbackInfo& info, void *origin);
         
-        Napi::ThreadSafeFunction onClickCallback;
         std::string text;
         bool checked;
         bool disabled;
