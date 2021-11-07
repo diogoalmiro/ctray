@@ -8,16 +8,13 @@ declare module 'ctray' {
             submenu?: MenuItem[];
         };
 
-        class Tray {
-            constructor(icon: string, menu: MenuItem[]);
-            
-            start(): Promise<>;
-            stop(): void;
-            update(): void;
-            
-            
+        class Tray extends events.EventEmitter {
+            constructor(icon: string);
+            close(): void;
+
             icon: string;
             menu: MenuItem[];
+            tooltip: string;
         };
     }
 

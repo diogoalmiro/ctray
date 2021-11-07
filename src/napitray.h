@@ -110,12 +110,7 @@ class NapiTray : public Napi::ObjectWrap<T> {
                 return;
             }
             Napi::Array arr = arg.As<Napi::Array>();
-            //napimenu = arg.As<Napi::Array>();
 
-            if( arr.Length() < 1 ){
-                THROW("Expected argument \"menu\" to have at least one element.");
-                return;
-            }
             Napi::Array menu = Napi::Array::New(env, arr.Length());
     
             Napi::Function constructor = NapiTrayItemConstructor.Value();
