@@ -33,6 +33,7 @@ class NapiTrayItem : public Napi::ObjectWrap<NapiTrayItem> {
             *constructor = Napi::Persistent(func);*/
 
             NapiTrayItemConstructor = Napi::Persistent(func);
+            NapiTrayItemConstructor.SuppressDestruct();
 
             return func;
         }

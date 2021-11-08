@@ -4,9 +4,6 @@
 #include <iostream>
 #include <gtk/gtk.h>
 #include <libappindicator/app-indicator.h>
-#include <cassert>
-
-std::mutex mtx;
 
 int i = 0;
 class Tray : public NapiTray<Tray> {
@@ -36,7 +33,6 @@ class Tray : public NapiTray<Tray> {
             bool separ = GTK_IS_SEPARATOR_MENU_ITEM(item->itemPointer);
             bool check = GTK_IS_CHECK_MENU_ITEM(item->itemPointer);
             bool menui = GTK_IS_MENU_ITEM(item->itemPointer);
-            printf("updated item %d %d %d\n", separ, check, menui);
 
             if( updated.compare("text") == 0 ){
                 if( GTK_IS_SEPARATOR_MENU_ITEM(item->itemPointer) ){
@@ -67,7 +63,6 @@ class Tray : public NapiTray<Tray> {
         }
 
         static void OnTrayUpdate(const Napi::CallbackInfo& info){
-            std::cerr << "OnTrayUpdate\n";
             if( info.Length() < 1 ){
                 std::cerr << "Unknown update, without a argument.\n";
                 return;
@@ -84,7 +79,6 @@ class Tray : public NapiTray<Tray> {
             }
 
             std::string updated = info[0].As<Napi::String>().Utf8Value();
-            std::cout << "update " << updated << "\n";
             if( updated.compare("menu") == 0 ){
                 app_indicator_set_menu(t->indicator, GTK_MENU(PrepareMenu(info, t->menuref.Value(), t)));
             }
@@ -97,10 +91,8 @@ class Tray : public NapiTray<Tray> {
         }
 
         Tray(const Napi::CallbackInfo& info) : NapiTray<Tray>(info) {
-            mtx.lock();
             sprintf(id, "tray-indicator-id-%04d", i);
             i++;
-            mtx.unlock();
 
             indicator = app_indicator_new(id,icon.c_str(),APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
             app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
@@ -111,9 +103,7 @@ class Tray : public NapiTray<Tray> {
 
     private:
         AppIndicator* indicator = nullptr;
-        std::mutex stop;
         char id[80] = "tray-indicator-id-nnnn";
-        char *indicatorPath = nullptr;
 };
 
 struct callback_info{
@@ -175,6 +165,7 @@ std::thread gtkThread;
 void QuitGtk(void *){
     gtk_main_quit();
     gtkThread.join();
+    NapiTrayItemConstructor.~Reference();
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
@@ -185,7 +176,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     gtkThread = std::thread(gtk_main);
 
-    napi_add_env_cleanup_hook(env, &QuitGtk, &gtkThread);
+    napi_add_env_cleanup_hook(env, &QuitGtk, nullptr);
 
     return Tray::Init(env, exports);
 }

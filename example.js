@@ -2,7 +2,7 @@ let path = require('path');
 let Tray = require('./tray');
 
 // Easier way to create items with a text that output that text on click
-let item = (txt) => ({text:txt, callback: o => console.log(o)});
+let item = (txt) => ({text:txt, callback: _ => console.log(txt)});
 
 // Create first tray
 let tray = new Tray(path.join(__dirname,"ctray.ico"));
