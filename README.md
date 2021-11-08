@@ -7,7 +7,7 @@
 
 Cross-platform Node.js class to create system trays.
 
-**Note:** This package was not yet tested on MacOS. [(See issue #2)](https://github.com/diogoalmiro/ctray/issues/2)
+**Note:** This package does not support macOS. [(See issue #2)](https://github.com/diogoalmiro/ctray/issues/2)
 
 ## Installation
 
@@ -38,7 +38,7 @@ See [the example file](example.js) for a more complex example.
 ### Constructor `new Tray(icon: string) : Tray`
 
 Creates the tray's instance displays the icon on the taskbar.
-Tray extends from EventEmitter and it emits "close" once it is closed.
+Tray extends from EventEmitter, and it emits "close" once it is closed.
 
 ### `tray#close(): void`
 
@@ -50,7 +50,7 @@ Getter/Setter for the tooltip to show over the tray.
 
 ### `tray#icon: string`
 
-Getter/Setter for the icon to display
+Getter/Setter for the absolute path to the icon to display.
 
 ### `tray#menu: MenuItem[]`
 
@@ -66,9 +66,9 @@ type MenuItem = {
 }
 ```
 
-Note that getting this property will return the Array as Object to prevent the usage of Array functions to add/remove elements as it is not supported.
+Note that getting this property will return the menu Array as an Object to prevent Array functions that add/remove elements as they are not supported.
 
-Setting `text = '-'` creates a separator MenuItem that cannot have its text changes nor have submenu.
+Setting `text = '-'` creates a MenuItem of type "separator". Its text cannot be changed nor have submenus.
 
 ## Next steps
 
