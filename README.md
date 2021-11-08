@@ -7,7 +7,7 @@
 
 Cross-platform Node.js class to create system trays.
 
-**Note:** This package was not yet tested on MacOS. [(See issue #2)](https://github.com/diogoalmiro/ctray/issues/2)
+**Note:** This package does not support macOS. [(See issue #2)](https://github.com/diogoalmiro/ctray/issues/2)
 
 ## Installation
 
@@ -20,23 +20,41 @@ Cross-platform Node.js class to create system trays.
 ```javascript
 let Tray = require("ctray");
 
-let tray = new Tray("path/to/icon", [
-    {text: "Hello World!"},
-    {text: "Quit", callback: _ => tray.stop()}
+let tray = new Tray("path/to/icon");
+
+tray.tooltip = "Simple Example Tray"; // Sets the tooltip to display
+
+tray.menu = [ // Sets the tray menu
+    "Example",
+    "-",
+    {text: "Quit", callback: _ => tray.close()}
 ])
 
-tray.start().then( () => console.log("Tray Closed") )
+tray.on("close", () => console.log("Tray Closed"));
 ```
 
 See [the example file](example.js) for a more complex example.
 
-### Constructor `new Tray(icon: string, menu: MenuItem[]) : Tray`
+### Constructor `new Tray(icon: string) : Tray`
 
-Creates an instance of the tray.
+Creates the tray's instance displays the icon on the taskbar.
+Tray extends from EventEmitter, and it emits "close" once it is closed.
 
-The `icon` parameter is an absolute path to an `.ico` file.
+### `tray#close(): void`
 
-The `menu` parameter is an array with at least one element. Each element of the array can either be a String or an Object with the following format:
+Requests the tray to close and emits "close".
+
+### `tray#tooltip: string`
+
+Getter/Setter for the tooltip to show over the tray.
+
+### `tray#icon: string`
+
+Getter/Setter for the absolute path to the icon to display.
+
+### `tray#menu: MenuItem[]`
+
+Setter for the menu of the tray. Each element of the array can either be a String or an Object with the following format:
 
 ```javascript
 type MenuItem = {
@@ -47,23 +65,10 @@ type MenuItem = {
     submenu?:  MenuItem[], // Array With the same rules as menu
 }
 ```
-Internaly a String will be converted to the object text specified and the default arguments (without a callback).
 
-When `text` is `"-"` the tray will create a separator in the tray. The other values of the item are ignored in this case.
+Note that getting this property will return the menu Array as an Object to prevent Array functions that add/remove elements as they are not supported.
 
-### `tray#start() : Promise`
-
-Shows the tray, the promise is fulfilled when the tray closes.
-
-### `tray#update() : void`
-
-Updates tray after changes on `tray.menu` or `tray.icon`. 
-
-**Note:** It reacts to `tray.menu = ...`, **not updates inside the array** (e.g. `tray.menu[0].text = ...`)
-
-### `tray#stop() : void`
-
-Stops the tray.
+Setting `text = '-'` creates a MenuItem of type "separator". Its text cannot be changed nor have submenus.
 
 ## Next steps
 

@@ -1,11 +1,12 @@
 let path = require('path');
 let Tray = require('./tray');
 
-let item = (txt) => ({text:txt, callback: () => console.log(txt)})
+// Easier way to create items with a text that output that text on click
+let item = (txt) => ({text:txt, callback: _ => console.log(txt)});
 
-let tray = new Tray(path.join(__dirname,"ctray.ico"), [
-    "Tray Example",
-    "-",
+// Create first tray
+let tray = new Tray(path.join(__dirname,"ctray.ico"));
+tray.menu = ["Tray Example",
     item("Hello World!"),
     item("Hello Tray!"),
     item("Hello C++!"),
@@ -15,22 +16,27 @@ let tray = new Tray(path.join(__dirname,"ctray.ico"), [
         item("Hello xfce-terminal!")
     ]},
     {text: "Update", callback: () => {
+        // On click update menu to be able to close tray
         tray.menu = [
             "Good Bye!",
             "-",
-            {text: "Quit", callback: () => {
-                    tray.stop();
-                }}
-            ];
-        tray.update();
+            {text: "Quit", callback: () => tray.close()}
+        ];
     }}
-]);
+];
 
-tray.start()
-    .then(_ => console.log("Tray Closed"));
+tray.on("close", () => console.log("First Tray Closed!"));
 
+let i = tray.menu[0];
+i.text = "Overwrite text";
+i.on("click", () => {
+    console.log("Add more callbacks using the EventEmitter of this item");
+    i.checked = !i.checked;
+})
 
-let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"), [
+// Multiple trays at the same time
+let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"));
+tray2.menu = [
     "Tray2 Example",
     "-",
     item("Hello World!"),
@@ -45,24 +51,18 @@ let tray2 = new Tray(path.join(__dirname,"ctray-alert.ico"), [
         tray2.menu = [
             "Good Bye!",
             "-",
-            {text: "Quit", callback: () => {
-                    tray2.stop();
-                }}
-            ];
-        tray2.update();
+            {text: "Quit", callback: () => tray2.close()}
+        ];
     }}
-]);
-
-tray2.start()
-    .then(_ => console.log("Tray2 Closed"));
+];
 
 
-    for(let i=0; i < 5; i++){
-        let c = i;
-        let tray = new Tray(path.join(__dirname,"ctray.ico"), [
-            { text: `Tray #${c}`, callback: () => console.log("Hello from tray", c) },
-            { text: "Close", callback: () => tray.stop() }
-        ])
-        tray.start().then(_ => console.log(`Tray ${c} closed.`)).catch(e => console.log(e))
-    }
-    
+// Event more trays
+for(let i=0; i < 5; i++){
+    let c = i;
+    let tray = new Tray(path.join(__dirname,"ctray.ico"))
+    tray.menu = [
+        { text: `Tray #${c}`, callback: () => console.log("Hello from tray", c) },
+        { text: "Close", callback: () => tray.close() }
+    ]
+}

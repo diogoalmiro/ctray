@@ -1,6 +1,6 @@
 {
   "name": "ctray",
-  "version": "0.0.11",
+  "version": "1.0.0",
   "description": "Cross-platform (tested on linux and windows) Node.js class to create system trays.",
   "main": "tray.js",
   "keywords": [

@@ -2,175 +2,77 @@
 #define _NAPITRAY_H
 
 #include <napi.h>
+#include "napitrayitem.h"
 
 #define THROW(error) Napi::TypeError::New( env, error ).ThrowAsJavaScriptException()
 
-struct tray_menu;
-typedef struct tray_menu {
-    char *text;
-    int disabled;
-    int checked;
-
-    void (*cb)(struct tray_menu*);
-    void *context;
-
-    struct tray_menu* submenu;
-} tray_menu_t;
-
-//
-// Convert JS Objects to Internal Struct
-//
-void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj);
-
-tray_menu_t* NapiArray2TrayMenu(Napi::Env env, Napi::Array napimenu){
-
-    size_t msize = napimenu.Length();
-    struct tray_menu* r = new struct tray_menu[msize+1];
-
-    for (size_t i = 0; i < msize; i++){
-        Napi::Value curr = napimenu.Get(i);
-        if( curr.IsString() ){
-            Napi::Object c = Napi::Object::New(env);
-            c.Set("text", curr.As<Napi::String>());
-            curr = c;
-        }
-        if( !curr.IsObject() ){
-            THROW("Expected all array elements to be Objects.");
-            return NULL;
-        }
-
-        InitTrayMenu(&r[i], env, curr.As<Napi::Object>());
-    }
-
-    r[msize].text = NULL;
-    r[msize].checked = 0;
-    r[msize].disabled = 1;
-    r[msize].cb = NULL;
-    r[msize].submenu = NULL;
-    r[msize].context = NULL;
-    return r;
-}
-
-struct tscb{
-    Napi::ThreadSafeFunction callback;
-};
-
-void InitTrayMenu(tray_menu_t* r, Napi::Env env, Napi::Object obj){
-    if( !obj.Has("text") ) {
-        THROW("Object requires \"text\" property.");
-        return;
-    }
-    if( !obj.Get("text").IsString() ){
-        THROW("Expected \"text\" property to be a string.");
-        return;
-    }
-
-    std::string text = obj.Get("text").As<Napi::String>().Utf8Value();
-    r->text = new char[text.length()+1];
-    strcpy( r->text, text.c_str() );
-    
-    if( obj.Has("submenu") ){
-        if( !obj.Get("submenu").IsArray() ){
-            THROW("Expected \"submmenu\" property to be an array.");
-            return;
-        }
-        r->submenu = NapiArray2TrayMenu(env, obj.Get("submenu").As<Napi::Array>());
-    }
-    else{
-        r->submenu = NULL;
-    }
-
-    if( obj.Has("disabled") ){
-        if( !obj.Get("disabled").IsBoolean() ){
-            THROW("Expected \"disabled\" property to be a boolean.");
-            return;
-        }
-        r->disabled = obj.Get("disabled").As<Napi::Boolean>().Value(); 
-    }
-    else{
-        r->disabled = 0;
-    }
-    
-
-    if( obj.Has("checked") ){
-        if( !obj.Get("checked").IsBoolean() ){
-            THROW("Expected \"checked\" property to be a boolean.");
-            return;
-        }
-        r->checked = obj.Get("checked").As<Napi::Boolean>().Value(); 
-    }
-    else{
-        r->checked = 0;
-    }
-    
-    if( obj.Has("callback") ){
-        if( !obj.Get("callback").IsFunction() ){
-            THROW("Expected \"callback\" property to be a function.");
-            return;
-        }
-        Napi::Function napicallback = obj.Get("callback").As<Napi::Function>();
-    
-        struct tscb *cb = new (struct tscb);
-        cb->callback = Napi::ThreadSafeFunction::New(env, napicallback, "click-callback", 0, 1); 
-        r->context = cb;
-        r->cb = [](tray_menu_t *ctx){
-            auto callback = [](Napi::Env env, Napi::Function jsCall){
-                jsCall.Call({});
-            };
-            struct tscb* tsf = (struct tscb*) ctx->context;
-            tsf->callback.BlockingCall( callback );
-        };
-    }
-    else{
-        r->context = NULL;
-        r->cb = NULL;
-    }
-}
-
-void ClearTrayMenuCallbacks(tray_menu_t* menu){
-    if( !menu ) return;
-    int i = 0;
-    tray_menu_t curr;
-    while( menu[i].text ){
-        curr = menu[i];
-        if( curr.context ){
-            ((struct tscb *)curr.context)->callback.Release();
-        }
-        if( curr.submenu ){
-            ClearTrayMenuCallbacks(curr.submenu);
-        }
-        i++;
-    }
-}
+#define EMIT(event_name, ...) info.This().As<Napi::Object>().Get("emit").As<Napi::Function>().Call(info.This(), {Napi::String::New(info.Env(), event_name), __VA_ARGS__})
 
 template<typename T>
 class NapiTray : public Napi::ObjectWrap<T> {
     public:
+        static void OnClickCallBack(Napi::Env env, Napi::Function emitter, NapiTrayItem *data){
+            Napi::Object TrayItemInstance = data->Value().As<Napi::Object>();
+            emitter.Call(TrayItemInstance, {Napi::String::New(env, "click")});
+        }
+
         static Napi::Object Init(Napi::Env env, Napi::Object exports){
             Napi::Function func =
                 NapiTray::DefineClass(env, "Tray", {
-                    NapiTray::InstanceMethod("start", &T::Start),
-                    NapiTray::InstanceMethod("update", &T::Update),
-                    NapiTray::InstanceMethod("stop", &T::Stop),
+                    NapiTray::InstanceMethod("close", &T::Close),
+                    NapiTray::InstanceAccessor("menu", &T::GetMenu, &T::SetMenu),
                     NapiTray::InstanceAccessor("icon", &T::GetIcon, &T::SetIcon),
-                    NapiTray::InstanceAccessor("menu", &T::GetMenu, &T::SetMenu)});
+                    NapiTray::InstanceAccessor("tooltip", &T::GetTooltip, &T::SetTooltip)});
             
+            Napi::Function EventEmitter = env.Global().Get("EventEmitter").As<Napi::Function>();
+            if( EventEmitter.IsEmpty() ){
+                THROW("Expected EventEmitter constructor on global object.");
+                return exports;
+            }
+            // Tray extends EventEmitter
+            func.Get("prototype").As<Napi::Object>().Set("__proto__", EventEmitter.Get("prototype"));
+            
+            // Add reference to TrayItem class
+            NapiTrayItem::Init(env, exports);
+            
+
+
             Napi::FunctionReference* constructor = new Napi::FunctionReference();
             *constructor = Napi::Persistent(func);
             env.SetInstanceData(constructor);
-
             return func;
         }
         
         NapiTray(const Napi::CallbackInfo& info) : Napi::ObjectWrap<T>(info) {
             Napi::Env env = info.Env();
-            if( info.Length() < 2 ){
-                THROW("Expected two arguments, \"icon\": string and \"menu\": array.");
+            if( info.Length() < 1 ){
+                THROW("Expected argument \"icon\": string.");
                 return;
             }
+            menuref = Napi::Persistent<Napi::Array>(Napi::Array::New(env, 0));
+            tooltip = "NapiTray Icon";
+            icon = "";
 
             SetIcon(info, info[0].As<Napi::Value>());
-            SetMenu(info, info[1].As<Napi::Value>());
+
+
+            info.This().As<Napi::Object>()
+                .Get("on").As<Napi::Function>()
+                .Call(info.This(), {Napi::String::New(info.Env(), "update"), Napi::Function::New<T::OnTrayUpdate>(info.Env(), nullptr, this)});
+
+            info.This().As<Napi::Object>()
+                .Get("on").As<Napi::Function>()
+                .Call(info.This(), {Napi::String::New(info.Env(), "close"), Napi::Function::New<T::OnTrayClose>(info.Env(), nullptr, this)});
+            
+            Napi::Function Emit = info.This().As<Napi::Object>().Get("emit").As<Napi::Function>();
+            onClickCallback = Napi::ThreadSafeFunction::New(env, Emit, "emit-click", 0, 1);
+        }
+
+        Napi::Value Close(const Napi::CallbackInfo& info){
+            Napi::Function Emit = info.This().As<Napi::Object>().Get("emit").As<Napi::Function>();
+            Emit.Call(info.This(), {Napi::String::New(info.Env(), "close")});
+            this->Destroy();
+            return info.Env().Undefined();
         }
 
         void SetIcon(const Napi::CallbackInfo& info, const Napi::Value& arg){
@@ -179,15 +81,26 @@ class NapiTray : public Napi::ObjectWrap<T> {
                 THROW("Expected argument \"icon\" to be a string.");
                 return;
             }
-            Napi::String str = arg.As<Napi::String>();
-
-            std::string iname = str.Utf8Value();
-            icon = new char[iname.length()+1];
-            strcpy(icon, iname.c_str());
+            icon = arg.As<Napi::String>().Utf8Value();
+            EMIT("update", Napi::String::New(info.Env(), "icon"));
         }
 
         Napi::Value GetIcon(const Napi::CallbackInfo& info){
             return Napi::String::New(info.Env(), icon);
+        }
+
+        void SetTooltip(const Napi::CallbackInfo& info, const Napi::Value& arg){
+            Napi::Env env = info.Env();
+            if( !arg.IsString() ){
+                THROW("Expected argument \"tooltip\" to be a string.");
+                return;
+            }
+            tooltip = arg.As<Napi::String>().Utf8Value();
+            EMIT("update", Napi::String::New(info.Env(), "tooltip"));
+        }
+
+        Napi::Value GetTooltip(const Napi::CallbackInfo& info){
+            return Napi::String::New(info.Env(), tooltip);
         }
 
         void SetMenu(const Napi::CallbackInfo& info, const Napi::Value& arg){
@@ -197,46 +110,54 @@ class NapiTray : public Napi::ObjectWrap<T> {
                 return;
             }
             Napi::Array arr = arg.As<Napi::Array>();
-            //napimenu = arg.As<Napi::Array>();
 
-            if( arr.Length() < 1 ){
-                THROW("Expected argument \"menu\" to have at least one element.");
-                return;
+            Napi::Array menu = Napi::Array::New(env, arr.Length());
+    
+            Napi::Function constructor = NapiTrayItemConstructor.Value();
+            for(uint32_t i = 0; i < arr.Length(); i++){
+                Napi::Value arg = arr.Get(i);
+                if( arg.IsObject() && arg.As<Napi::Object>().InstanceOf(constructor) ){
+                    menu[i] = arg;
+                }
+                else{
+                    menu[i] = constructor.New({ arg });
+                }
+
+                menu.Get(i).As<Napi::Object>()
+                    .Get("on").As<Napi::Function>()
+                    .Call(menu.Get(i), {Napi::String::New(info.Env(), "update"), Napi::Function::New<T::OnTrayItemUpdate>(info.Env(), nullptr, NapiTrayItem::Unwrap(menu.Get(i).As<Napi::Object>()))});
             }
-
-            old = menu;
-            menu = NapiArray2TrayMenu(env, arr);
-            napimenu = Napi::Reference<Napi::Array>::New(arr, 1);
+            menuref = Napi::Persistent(menu);
+            EMIT("update", Napi::String::New(env, "menu"));
         }
 
         Napi::Value GetMenu(const Napi::CallbackInfo& info){
-            return napimenu.Value();
+            Napi::Object res = Napi::Object::New(info.Env()); // Menu should not extend array;
+            Napi::Array from = menuref.Value();
+            for( uint32_t i = 0; i < from.Length(); i++){
+                res.Set(i, from.Get(i));
+            }
+            return res;
         }
 
-        void ReleaseOldCallbacks(){
-            ClearTrayMenuCallbacks(old);
-            old = NULL;
+        void Click(NapiTrayItem *item){
+            onClickCallback.BlockingCall( item, OnClickCallBack );
         }
 
-        void ReleaseCallbacks(){
-            ReleaseOldCallbacks();
-            old = menu;
-            ReleaseOldCallbacks();
+        void Destroy(){
+            onClickCallback.Release();
         }
 
-        virtual Napi::Value Start(const Napi::CallbackInfo& info) = 0;
-        virtual Napi::Value Stop(const Napi::CallbackInfo& info) = 0;
-        virtual Napi::Value Update(const Napi::CallbackInfo& info) = 0;
-        virtual void Loop() = 0;
+        std::string icon;
+        std::string tooltip;
+        Napi::Reference<Napi::Array> menuref;
 
-        char* icon;
-        tray_menu_t* menu = NULL;
-        tray_menu_t* old = NULL;
+        Napi::ThreadSafeFunction onClickCallback;
+
+        void* menuPointer = nullptr;
         
-    protected: 
-        // Js representation (getter, setter)
-        Napi::Reference<Napi::Array> napimenu;
-
 };
+
+void* PrepareMenu(const Napi::CallbackInfo& info, Napi::Array currMenu, void*origin);
 
 #endif
