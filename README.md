@@ -28,7 +28,7 @@ tray.menu = [ // Sets the tray menu
     "Example",
     "-",
     {text: "Quit", callback: _ => tray.close()}
-])
+]
 
 tray.on("close", () => console.log("Tray Closed"));
 ```
